@@ -55,8 +55,16 @@ class AnimatedFace:
         mouth_y_base = int(self.height * 0.7)
         mouth_w, mouth_h = self.width // 3, self.width // 6
         mouth_shape = "smile"
+        eye_open_factor = 1.0 # Default fully open
         
-        if state == "idle":
+        if state == "booting":
+            eye_open_factor = 0.0 # Eyes closed during boot
+            mouth_shape = "smile"
+        elif state == "opening":
+            # Smoothly open eyes over 30 frames
+            eye_open_factor = min(1.0, t / 30.0)
+            mouth_shape = "smile"
+        elif state == "idle":
             face_offset_y += int((self.height // 80) * math.sin(t * 0.03))
             pupil_offset_x = int((self.width // 30) * math.sin(t * 0.01))
             mouth_shape = "smile"
@@ -77,21 +85,36 @@ class AnimatedFace:
             mouth_h = int(self.width // 24 * mouth_open)
 
         # Draw features
-        self._draw_eyes(surface, face_offset_x, face_offset_y, pupil_offset_x, pupil_offset_y, t)
+        self._draw_eyes(surface, face_offset_x, face_offset_y, pupil_offset_x, pupil_offset_y, t, eye_open_factor)
         self._draw_mouth(surface, face_offset_x, face_offset_y, mouth_y_base, mouth_w, mouth_h, mouth_shape)
 
-    def _draw_eyes(self, surface, fx, fy, px, py, t):
+    def _draw_eyes(self, surface, fx, fy, px, py, t, open_factor=1.0):
         eye_radius, iris_radius, pupil_radius = self.width // 8, self.width // 20, self.width // 40
-        shadow_offset, blink = self.thickness // 2, (t % 150) < 10
+        shadow_offset = self.thickness // 2
+        # Normal blink every 5 seconds
+        blink = (t % 150) < 10
+        
+        # Combined factor
+        current_open = open_factor if not blink else 0.0
+        
         centers = [(self.width // 3 + fx, self.height // 2 + fy), (2 * self.width // 3 + fx, self.height // 2 + fy)]
         for c in centers:
+            # Shadow
             pygame.draw.circle(surface, self.colors['FACE_SHADOW'], (c[0] + shadow_offset, c[1] + shadow_offset), eye_radius)
-            pygame.draw.circle(surface, self.colors['FACE_MAIN'], c, eye_radius)
-            if not blink:
-                ix = max(c[0] - eye_radius//2, min(c[0] + px, c[0] + eye_radius//2))
-                iy = max(c[1] - eye_radius//2, min(c[1] + py, c[1] + eye_radius//2))
-                pygame.draw.circle(surface, self.colors['FACE_IRIS'], (ix, iy), int(iris_radius))
-                pygame.draw.circle(surface, self.colors['FACE_MAIN'], (ix, iy), int(pupil_radius))
+            
+            # Eye socket / lid
+            if current_open <= 0.1:
+                # Closed: just a line
+                pygame.draw.line(surface, self.colors['FACE_MAIN'], (c[0] - eye_radius, c[1]), (c[0] + eye_radius, c[1]), self.thickness)
+            else:
+                # Open: circle
+                pygame.draw.circle(surface, self.colors['FACE_MAIN'], c, eye_radius)
+                # Iris and Pupil (only if open enough)
+                if current_open > 0.5:
+                    ix = max(c[0] - eye_radius//2, min(c[0] + px, c[0] + eye_radius//2))
+                    iy = max(c[1] - eye_radius//2, min(c[1] + py, c[1] + eye_radius//2))
+                    pygame.draw.circle(surface, self.colors['FACE_IRIS'], (ix, iy), int(iris_radius * current_open))
+                    pygame.draw.circle(surface, self.colors['FACE_MAIN'], (ix, iy), int(pupil_radius * current_open))
 
     def _draw_mouth(self, surface, fx, fy, y_base, w, h, shape):
         mx, my, so = self.width // 2 + fx, y_base + fy, self.thickness // 2
