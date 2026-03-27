@@ -1,143 +1,105 @@
-#!/usr/bin/env python3
-import os
-import argparse
-import math
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--headless", action="store_true")
-args = parser.parse_args()
-
-if args.headless:
-    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-
 import pygame
+import os
+import ctypes
+from ctypes import util
 from pygame import Surface
-from pygame.locals import QUIT, KEYDOWN, K_ESCAPE, K_1, K_2, K_3, K_4
+from pygame.locals import QUIT, KEYDOWN, K_ESCAPE, K_1, K_2, K_3, K_4, K_5, K_6, NOFRAME, MOUSEBUTTONDOWN, MOUSEBUTTONUP, MOUSEMOTION
+from pixel_renderer import AnimatedFace, draw_loading, draw_exploding
 
+# CONFIGURATION
 RENDER_W, RENDER_H = 1000, 1000
 INTERNAL_W, INTERNAL_H = 32, 32
 WINDOW_W, WINDOW_H = 320, 320
 FPS = 30
 
-STATES = ["idle", "travail", "reflexion", "parle"]
-CURRENT_STATE = "idle"
+# SEMANTIC COLORS (Original Deep Blue Theme)
+COLORS = {
+    'BACKGROUND': (30, 30, 45),     # Deep Midnight Blue
+    'VIGNETTE': (15, 15, 25),       # Dark Blue-tinted edges
+    'FACE_MAIN': (0, 0, 0),         # Pure black
+    'FACE_IRIS': (70, 130, 180),    # Steel Blue
+    'FACE_SHADOW': (40, 40, 60),    # Muted dark blue shadow
+    'LIGHT_BASE': (255, 255, 255)   # Pure white highlight
+}
 
-
-def draw_eyes(surface: Surface, t: int, state: str) -> None:
-    width, height = surface.get_size()
-    surface.fill((255, 255, 255))
-
-    face_offset_x = int((width // 50) * math.sin(t * 0.015))
-    face_offset_y = int((height // 50) * math.cos(t * 0.02))
-
-    eye_radius = width // 8
-    iris_radius = eye_radius // 2.5
-    pupil_radius = iris_radius // 2
-
-    left_eye_x = width // 3 + face_offset_x
-    right_eye_x = 2 * width // 3 + face_offset_x
-    eye_y = height // 2 + face_offset_y
-
-    if state == "idle":
-        head_offset_x = int((width // 50) * math.sin(t * 0.02))
-        head_offset_y = int((height // 60) * math.cos(t * 0.03))
-    elif state == "travail":
-        head_offset_x = int((width // 40) * math.sin(t * 0.06))
-        head_offset_y = int((height // 50) * math.cos(t * 0.05))
-    elif state == "reflexion":
-        head_offset_x = int((width // 60) * math.sin(t * 0.03))
-        head_offset_y = int((height // 40) * math.sin(t * 0.04))
-    elif state == "parle":
-        head_offset_x = int((width // 45) * math.sin(t * 0.1))
-        head_offset_y = int((height // 50) * math.sin(t * 0.08))
-    else:
-        head_offset_x = 0
-        head_offset_y = 0
-
-    blink = (t % 120) < 10
-
-    def draw_eye(cx, cy):
-        pygame.draw.circle(surface, (0, 0, 0), (cx, cy), eye_radius)
-
-        if not blink:
-            iris_x = cx + head_offset_x
-            iris_y = cy + head_offset_y
-
-            iris_x = max(cx - iris_radius, min(iris_x, cx + iris_radius))
-            iris_y = max(cy - iris_radius, min(iris_y, cy + iris_radius))
-
-            pygame.draw.circle(surface, (70, 130, 180), (iris_x, iris_y), int(iris_radius))
-            pygame.draw.circle(surface, (0, 0, 0), (iris_x, iris_y), int(pupil_radius))
-
-    draw_eye(left_eye_x, eye_y)
-    draw_eye(right_eye_x, eye_y)
-
-    mouth_y = int(height * 0.7) + face_offset_y
-    mouth_width = width // 5
-    mouth_center = width // 2 + face_offset_x
-    mouth_height = int(mouth_width // 3)
-
-    if state == "idle":
-        y_offset = int(mouth_height * 0.3 * math.sin(t * 0.04))
-        pygame.draw.arc(surface, (0, 0, 0), (mouth_center - mouth_width, mouth_y + y_offset, mouth_width * 2, mouth_height), 0, math.pi, 3)
-    elif state == "travail":
-        pygame.draw.line(surface, (0, 0, 0), (mouth_center - mouth_width // 2, mouth_y), (mouth_center + mouth_width // 2, mouth_y), 3)
-    elif state == "reflexion":
-        pygame.draw.circle(surface, (0, 0, 0), (mouth_center, mouth_y), int(mouth_width // 4), 3)
-    elif state == "parle":
-        y_offset = int(mouth_height * 0.5 * (0.5 + 0.5 * math.sin(t * 0.15)))
-        pygame.draw.ellipse(surface, (0, 0, 0), (mouth_center - mouth_width // 2, mouth_y - y_offset, mouth_width, y_offset * 2))
-
+STATE_KEYS = {K_1: "idle", K_2: "working", K_3: "thinking", K_4: "speaking", K_5: "loading", K_6: "exploding"}
 
 def main():
-    global CURRENT_STATE
     pygame.init()
     clock = pygame.time.Clock()
+    
+    # Borderless Window
+    screen = pygame.display.set_mode((WINDOW_W, WINDOW_H), NOFRAME)
+    pygame.display.set_caption("Pixel Display System")
 
-    screen = pygame.display.set_mode((WINDOW_W, WINDOW_H))
-    pygame.display.set_caption("Eyes")
-
+    # Get SDL Window pointer for moving
+    sdl2_lib = ctypes.CDLL(util.find_library('SDL2'))
+    # In Pygame 2, wm_info has 'window' for Linux/X11
+    wm_info = pygame.display.get_wm_info()
+    sdl_window_ptr = wm_info.get('window') 
+    
+    # Instance for the face only
+    face_renderer = AnimatedFace(RENDER_W, RENDER_H, COLORS)
+    
+    current_state = "idle"
     t = 0
     running = True
 
-    if args.headless:
-        hq = Surface((RENDER_W, RENDER_H))
-        draw_eyes(hq, t, "idle")
-        logical = pygame.transform.scale(hq, (INTERNAL_W, INTERNAL_H))
-        scaled = pygame.transform.scale(logical, (WINDOW_W, WINDOW_H))
-        pygame.image.save(scaled, "output.png")
-        print("Saved output.png")
-        pygame.quit()
-        return
+    # Mouse dragging state
+    dragging = False
+    drag_offset_x = 0
+    drag_offset_y = 0
 
     while running:
         for event in pygame.event.get():
-            if event.type == QUIT:
-                running = False
+            if event.type == QUIT: running = False
             elif event.type == KEYDOWN:
-                if event.key == K_ESCAPE:
-                    running = False
-                elif event.key == K_1:
-                    CURRENT_STATE = "idle"
-                elif event.key == K_2:
-                    CURRENT_STATE = "travail"
-                elif event.key == K_3:
-                    CURRENT_STATE = "reflexion"
-                elif event.key == K_4:
-                    CURRENT_STATE = "parle"
+                if event.key == K_ESCAPE: running = False
+                elif event.key in STATE_KEYS: current_state = STATE_KEYS[event.key]
+            
+            # Dragging logic
+            elif event.type == MOUSEBUTTONDOWN:
+                if event.button == 1: # Left click
+                    dragging = True
+                    mx, my = pygame.mouse.get_pos()
+                    drag_offset_x, drag_offset_y = mx, my
+            elif event.type == MOUSEBUTTONUP:
+                if event.button == 1:
+                    dragging = False
+            elif event.type == MOUSEMOTION:
+                if dragging:
+                    # Use SDL directly to get global screen mouse position
+                    # SDL_GetGlobalMouseState(int *x, int *y)
+                    mx_global = ctypes.c_int()
+                    my_global = ctypes.c_int()
+                    if sdl2_lib:
+                        sdl2_lib.SDL_GetGlobalMouseState(ctypes.byref(mx_global), ctypes.byref(my_global))
+                        # Calculate and set new window position
+                        new_x = mx_global.value - drag_offset_x
+                        new_y = my_global.value - drag_offset_y
+                        if sdl_window_ptr:
+                            sdl2_lib.SDL_SetWindowPosition(sdl_window_ptr, new_x, new_y)
+        hq_surf = Surface((RENDER_W, RENDER_H))
 
-        hq = Surface((RENDER_W, RENDER_H))
-        draw_eyes(hq, t, CURRENT_STATE)
-        logical = pygame.transform.scale(hq, (INTERNAL_W, INTERNAL_H))
-        scaled = pygame.transform.scale(logical, (WINDOW_W, WINDOW_H))
-        screen.blit(scaled, (0, 0))
+        # ROUTING THE DRAWING ACCORDING TO STATE
+        if current_state == "loading":
+            draw_loading(hq_surf, t, RENDER_W, RENDER_H, COLORS)
+        elif current_state == "exploding":
+            draw_exploding(hq_surf, t, RENDER_W, RENDER_H, COLORS)
+        else:
+            # Drawing handled by the special AnimatedFace class
+            face_renderer.render(hq_surf, current_state, t)
+
+        # TRANSFORMATION 32X32 (PIXEL ART EFFECT)
+        pixel_surf = pygame.transform.scale(hq_surf, (INTERNAL_W, INTERNAL_H))
+        final_surf = pygame.transform.scale(pixel_surf, (WINDOW_W, WINDOW_H))
+
+        screen.blit(final_surf, (0, 0))
         pygame.display.flip()
-
         t += 1
         clock.tick(FPS)
 
     pygame.quit()
-
 
 if __name__ == '__main__':
     main()
