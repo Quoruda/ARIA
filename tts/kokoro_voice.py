@@ -4,7 +4,7 @@ from tts.voice import Voice
 
 class KokoroVoice(Voice):
     def __init__(self, lang_code='f', voice_name='ff_siwis', speed=1.0):
-        super().__init__() # Initialise la file d'attente du parent
+        super().__init__() # Initializes the parent queue
         self.lang_code = lang_code
         self.voice_name = voice_name
         self.speed = speed
@@ -12,11 +12,11 @@ class KokoroVoice(Voice):
 
     def load_model(self):
         """
-        Charge le modèle Kokoro en forçant strictement le CPU.
+        Loads the Kokoro model, explicitly forcing CPU device.
         """
         print(f"Loading Kokoro model (lang={self.lang_code}) on CPU...")
         
-        # 🔥 LA CORRECTION EST ICI : on ajoute device='cpu' (en string)
+        # device='cpu' ensures it runs on CPU
         self.pipeline = KPipeline(lang_code=self.lang_code, device='cpu')
         
         print("Kokoro model loaded!")

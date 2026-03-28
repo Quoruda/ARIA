@@ -32,10 +32,10 @@ class AgentBrain:
         """
         Yields the response chunk by chunk (streaming) from the agent.
         """
-        # Le paramètre stream=True permet de récupérer un générateur
+        # The stream=True parameter allows for generator-based output
         run_response = self.agent.run(user_input, stream=True)
         for chunk in run_response:
-            # Selon la version de Phidata, chunk peut être un string ou un objet
+            # Depending on Phidata version, chunk may be a string or an object
             content = chunk.content if hasattr(chunk, 'content') else chunk
             if content:
                 yield content
@@ -44,7 +44,7 @@ class AgentBrain:
 if __name__ == "__main__":
     # Test with default provider (Ollama)
     brain = AgentBrain()
-    print("--- Test Streaming ---")
-    for word in brain.get_stream_response("Salut, tu es prêt ?"):
+    print("--- Testing Streaming ---")
+    for word in brain.get_stream_response("Hello, are you ready?"):
         print(word, end="", flush=True)
     print()
