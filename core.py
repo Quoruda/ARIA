@@ -1,17 +1,44 @@
 import re
+import os
 import threading
+from dotenv import load_dotenv
+
 from brain.brain_module import AgentBrain
+from brain.ollama_provider import OllamaProvider
+from brain.mistral_provider import MistralProvider
 from tts.kokoro_voice import KokoroVoice
 
 class CoreManager:
     def __init__(self):
+        load_dotenv()
         print("--- Initialisation du Système ---")
-        self.brain = AgentBrain()
-        self.voice = KokoroVoice(lang_code='f', voice_name='ff_siwis')
         
-        # On charge le modèle vocal en mémoire
+        # 1. Sélection du Provider de Cerveau via .env
+        source = os.getenv("ARIA_AI_SOURCE", "ollama").lower()
+        if source == "mistral":
+            print("Mode: Mistral AI API")
+            provider = MistralProvider(
+                model_id=os.getenv("MISTRAL_MODEL_ID", "mistral-small-latest"),
+                api_key=os.getenv("MISTRAL_API_KEY")
+            )
+        else:
+            print(f"Mode: Ollama ({os.getenv('OLLAMA_MODEL_ID', 'mistral-nemo:12b')})")
+            provider = OllamaProvider(
+                model_id=os.getenv("OLLAMA_MODEL_ID", "mistral-nemo:12b"),
+                host=os.getenv("OLLAMA_HOST")
+            )
+            
+        self.brain = AgentBrain(provider=provider)
+        
+        # 2. Configuration de la voix via .env
+        self.voice = KokoroVoice(
+            lang_code=os.getenv("TTS_LANG", "f"), 
+            voice_name=os.getenv("TTS_VOICE", "ff_siwis"),
+            speed=float(os.getenv("TTS_SPEED", "1.0"))
+        )
+        
+        # Charge le modèle vocal en mémoire et démarre le flux
         self.voice.load_model()
-        # 🔥 C'est ici qu'était l'erreur : on appelle la nouvelle méthode du parent
         self.voice.start_playback() 
         print("--- Système Prêt ---")
 

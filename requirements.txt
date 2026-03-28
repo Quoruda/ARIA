@@ -5,3 +5,4 @@ mistralai
 sounddevice
 kokoro-onnx
 numpy
+python-dotenv
