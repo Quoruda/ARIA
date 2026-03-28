@@ -1,0 +1,7 @@
+pygame
+phidata
+ollama
+mistralai
+sounddevice
+kokoro-onnx
+numpy

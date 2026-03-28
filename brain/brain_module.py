@@ -1,14 +1,16 @@
 from phi.agent import Agent
-from phi.model.ollama import Ollama
+from .ollama_provider import OllamaProvider
 
 class AgentBrain:
-    def __init__(self, model_id="mistral-nemo:12b"):
+    def __init__(self, provider=None):
         """
-        Initializes the AI agent using Phidata.
-        Generic implementation for any assistant name.
+        Initializes the AI agent using Phidata and a provided model provider.
         """
+        if provider is None:
+            provider = OllamaProvider()
+            
         self.agent = Agent(
-            model=Ollama(id=model_id),
+            model=provider.get_model(),
             description="You are a sophisticated AI interface with a pixel-art face.",
             instructions=[
                 "Provide concise and helpful responses.",
@@ -40,5 +42,9 @@ class AgentBrain:
 
 # EXAMPLE USAGE
 if __name__ == "__main__":
+    # Test with default provider (Ollama)
     brain = AgentBrain()
-    print(brain.get_response("Hello, are you ready?"))
+    print("--- Test Streaming ---")
+    for word in brain.get_stream_response("Salut, tu es prêt ?"):
+        print(word, end="", flush=True)
+    print()
