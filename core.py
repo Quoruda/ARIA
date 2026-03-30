@@ -1,7 +1,13 @@
 import re
 import os
 import threading
+import logging
+import warnings
 from dotenv import load_dotenv
+
+# Suppress HF Hub and other library warnings
+logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 from brain.brain_module import AgentBrain
 from brain.ollama_provider import OllamaProvider
@@ -72,10 +78,12 @@ class CoreManager:
                 end_index = match.end()
                 phrase_to_speak = sentence_buffer[:end_index].strip()
                 
-                # --- NEW: CLEANING FILTER ---
-                # 1. Remove "Speaking:" or "**Speaking:**" (case insensitive)
-                phrase_propre = re.sub(r'\*?\*?Speaking:\*?\*?\s*', '', phrase_to_speak, flags=re.IGNORECASE)
-                # 2. Remove any remaining asterisks
+                # --- IMPROVED CLEANING FILTER ---
+                # 1. Remove markers like "Speaking:", "Thinking:", etc.
+                phrase_propre = re.sub(r'(?i)\b(speaking|thinking|processing|outputting)\b[:.]*\s*', '', phrase_to_speak)
+                # 2. Remove anything between asterisks (roleplay text like *hums softly*)
+                phrase_propre = re.sub(r'\*[^*]+\*', '', phrase_propre)
+                # 3. Clean up remaining asterisks and extra spaces
                 phrase_propre = phrase_propre.replace('*', '').strip()
                 
                 # Send to audio generation!
@@ -87,7 +95,9 @@ class CoreManager:
 
         # 3. Finally, send whatever remains in the buffer (if there was no trailing punctuation)
         if sentence_buffer.strip():
-            phrase_finale = re.sub(r'\*?\*?Speaking:\*?\*?\s*', '', sentence_buffer, flags=re.IGNORECASE).replace('*', '').strip()
+            phrase_finale = re.sub(r'(?i)\b(speaking|thinking|processing|outputting)\b[:.]*\s*', '', sentence_buffer)
+            phrase_finale = re.sub(r'\*[^*]+\*', '', phrase_finale)
+            phrase_finale = phrase_finale.replace('*', '').strip()
             if len(phrase_finale) > 1:
                 self.voice.generate_audio(phrase_finale)
         print() # New line when finished speaking

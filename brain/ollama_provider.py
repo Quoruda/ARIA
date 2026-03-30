@@ -1,4 +1,4 @@
-from phi.model.ollama import Ollama
+from langchain_ollama import ChatOllama
 from .model_provider import ModelProvider
 
 class OllamaProvider(ModelProvider):
@@ -8,4 +8,4 @@ class OllamaProvider(ModelProvider):
         self.host = host
         
     def get_model(self):
-        return Ollama(id=self.model_id, host=self.host, options={"temperature": self.temperature})
+        return ChatOllama(model=self.model_id, base_url=self.host, temperature=self.temperature)

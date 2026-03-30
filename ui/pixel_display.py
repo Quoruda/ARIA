@@ -30,6 +30,7 @@ STATE_KEYS = {K_1: "idle", K_2: "working", K_3: "thinking", K_4: "speaking", K_5
 def main():
     if os.name != 'nt':
         os.environ['SDL_VIDEODRIVER'] = 'x11'
+    os.environ['SDL_AUDIODRIVER'] = 'dummy'
 
     pygame.init()
     clock = pygame.time.Clock()

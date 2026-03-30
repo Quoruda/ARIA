@@ -1,8 +1,12 @@
 pygame
-phidata
+langchain-core
+langchain-ollama
+langchain-mistralai
+langgraph
 ollama
 mistralai
 sounddevice
 kokoro-onnx
 numpy
 python-dotenv
+kokoro
