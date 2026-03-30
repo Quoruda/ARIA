@@ -9,11 +9,11 @@ from pynput import keyboard
 import os
 from dotenv import load_dotenv
 
-from transcriber import BaseTranscriber
-from whisper_faster import FasterWhisperTranscriber
+from stt.transcriber import BaseTranscriber
+from stt.whisper_faster import FasterWhisperTranscriber
 
 class PushToTalkRecorder:
-    def __init__(self, transcriber: BaseTranscriber, sample_rate=16000, chunk_seconds=3):
+    def __init__(self, transcriber: BaseTranscriber, sample_rate=16000, chunk_seconds=3, on_transcription=None, can_record=None):
         self.transcriber = transcriber
         self.sample_rate = sample_rate
         self.chunk_size = sample_rate * chunk_seconds
@@ -23,6 +23,9 @@ class PushToTalkRecorder:
         self.hotkey = {keyboard.Key.ctrl_l, keyboard.Key.alt_l}
         self.pressed_keys = set()
         self.running = True
+        
+        self.on_transcription = on_transcription
+        self.can_record = can_record
 
     def _audio_callback(self, indata, frames, time_info, status):
         """Met l'audio en file d'attente (callback très léger = pas de blocage)."""
@@ -34,6 +37,8 @@ class PushToTalkRecorder:
     def _on_press(self, key):
         self.pressed_keys.add(key)
         if self.hotkey.issubset(self.pressed_keys) and not self.is_recording:
+            if self.can_record and not self.can_record():
+                return
             self.is_recording = True
             print("\n🎙  Enregistrement en cours...", flush=True)
 
@@ -47,6 +52,7 @@ class PushToTalkRecorder:
     def _process_queue(self):
         """Worker Thread unique : lit la queue et transcrit de manière asynchrone."""
         buffer = []
+        full_session_text = []
         current_frames = 0
 
         while self.running:
@@ -59,9 +65,16 @@ class PushToTalkRecorder:
                     text = self.transcriber.transcribe(audio_data)
                     if text:
                         print(f"  {text}", flush=True)
+                        full_session_text.append(text)
+                
+                final_text = " ".join(full_session_text).strip()
+                if final_text and self.on_transcription:
+                    self.on_transcription(final_text)
+
                 buffer.clear()
+                full_session_text.clear()
                 current_frames = 0
-                print("⏸️  Pause.", flush=True)
+                print("⏸️  Fin d'enregistrement.", flush=True)
 
             else:
                 # Accumulation ultra rapide dans une liste
@@ -77,6 +90,7 @@ class PushToTalkRecorder:
                     text = self.transcriber.transcribe(audio_data)
                     if text:
                         print(f"  {text}", flush=True)
+                        full_session_text.append(text)
 
     def start(self):
         """Démarre le thread de traitement et l'écoute du micro/clavier."""

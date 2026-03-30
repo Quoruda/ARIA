@@ -1,7 +1,7 @@
 # transcription.py
 import os
 from faster_whisper import WhisperModel
-from transcriber import BaseTranscriber
+from stt.transcriber import BaseTranscriber
 
 class FasterWhisperTranscriber(BaseTranscriber):
     def __init__(self, model_name="small", language="fr"):

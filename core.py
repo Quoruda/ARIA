@@ -50,7 +50,24 @@ class CoreManager:
         # Load voice model into memory and start playback stream
         self.voice.load_model()
         self.voice.start_playback() 
+        self._is_generating = False
+        
+        # 3. Configure Micro (STT)
+        from stt.micro_recorder import PushToTalkRecorder
+        from stt.whisper_faster import FasterWhisperTranscriber
+        stt_model = os.getenv("ARIA_STT_MODEL", "small")
+        stt_lang = os.getenv("ARIA_STT_LANG", "fr")
+        self.stt_engine = FasterWhisperTranscriber(model_name=stt_model, language=stt_lang)
+        self.recorder = PushToTalkRecorder(
+            transcriber=self.stt_engine,
+            on_transcription=self.process_input,
+            can_record=lambda: not self.is_aria_speaking()
+        )
         print("--- System Ready ---")
+
+    def is_aria_speaking(self):
+        """Returns True if the AI is generating text or if the audio queue is still playing."""
+        return self._is_generating or self.voice.audio_queue.unfinished_tasks > 0
 
     def process_input(self, user_text: str):
         """
@@ -64,61 +81,57 @@ class CoreManager:
         """
         Retrieves words one by one, builds sentences, and sends them to the voice module.
         """
-        sentence_buffer = ""
-        print("🔊 ARIA: ", end="", flush=True)
-        
-        # Regex to detect the end of a sentence (. ! ? followed by a space or end of line)
-        sentence_end_pattern = re.compile(r'([.!?]+(?:\s+|$))')
-
-        # 1. Read the Agent's stream word by word
-        for word in self.brain.get_stream_response(user_text):
-            print(word, end="", flush=True) # Console output
-            sentence_buffer += word
+        self._is_generating = True
+        try:
+            sentence_buffer = ""
+            print("🔊 ARIA: ", end="", flush=True)
             
-            # 2. Check if we have a complete sentence
-            match = sentence_end_pattern.search(sentence_buffer)
-            if match:
-                # Extract the full sentence
-                end_index = match.end()
-                phrase_to_speak = sentence_buffer[:end_index].strip()
-                
-                # --- IMPROVED CLEANING FILTER ---
-                # 1. Remove markers like "Speaking:", "Thinking:", etc.
-                phrase_propre = re.sub(r'(?i)\b(speaking|thinking|processing|outputting)\b[:.]*\s*', '', phrase_to_speak)
-                # 2. Remove anything between asterisks (roleplay text like *hums softly*)
-                phrase_propre = re.sub(r'\*[^*]+\*', '', phrase_propre)
-                # 3. Clean up remaining asterisks and extra spaces
-                phrase_propre = phrase_propre.replace('*', '').strip()
-                
-                # Send to audio generation!
-                if len(phrase_propre) > 1:
-                    self.voice.generate_audio(phrase_propre)
-                
-                # Keep the rest (if there are words after the punctuation)
-                sentence_buffer = sentence_buffer[end_index:]
+            # Regex to detect the end of a sentence (. ! ? followed by a space or end of line)
+            sentence_end_pattern = re.compile(r'([.!?]+(?:\s+|$))')
 
-        # 3. Finally, send whatever remains in the buffer (if there was no trailing punctuation)
-        if sentence_buffer.strip():
-            phrase_finale = re.sub(r'(?i)\b(speaking|thinking|processing|outputting)\b[:.]*\s*', '', sentence_buffer)
-            phrase_finale = re.sub(r'\*[^*]+\*', '', phrase_finale)
-            phrase_finale = phrase_finale.replace('*', '').strip()
-            if len(phrase_finale) > 1:
-                self.voice.generate_audio(phrase_finale)
-        print() # New line when finished speaking
+            # 1. Read the Agent's stream word by word
+            for word in self.brain.get_stream_response(user_text):
+                print(word, end="", flush=True) # Console output
+                sentence_buffer += word
+                
+                # 2. Check if we have a complete sentence
+                match = sentence_end_pattern.search(sentence_buffer)
+                if match:
+                    # Extract the full sentence
+                    end_index = match.end()
+                    phrase_to_speak = sentence_buffer[:end_index].strip()
+                    
+                    # --- IMPROVED CLEANING FILTER ---
+                    # 1. Remove markers like "Speaking:", "Thinking:", etc.
+                    phrase_propre = re.sub(r'(?i)\b(speaking|thinking|processing|outputting)\b[:.]*\s*', '', phrase_to_speak)
+                    # 2. Remove anything between asterisks (roleplay text like *hums softly*)
+                    phrase_propre = re.sub(r'\*[^*]+\*', '', phrase_propre)
+                    # 3. Clean up remaining asterisks and extra spaces
+                    phrase_propre = phrase_propre.replace('*', '').strip()
+                    
+                    # Send to audio generation!
+                    if len(phrase_propre) > 1:
+                        self.voice.generate_audio(phrase_propre)
+                    
+                    # Keep the rest (if there are words after the punctuation)
+                    sentence_buffer = sentence_buffer[end_index:]
+
+            # 3. Finally, send whatever remains in the buffer (if there was no trailing punctuation)
+            if sentence_buffer.strip():
+                phrase_finale = re.sub(r'(?i)\b(speaking|thinking|processing|outputting)\b[:.]*\s*', '', sentence_buffer)
+                phrase_finale = re.sub(r'\*[^*]+\*', '', phrase_finale)
+                phrase_finale = phrase_finale.replace('*', '').strip()
+                if len(phrase_finale) > 1:
+                    self.voice.generate_audio(phrase_finale)
+        finally:
+            self._is_generating = False
+            print("\n💡 Appuyez sur Ctrl+Alt pour parler.", flush=True)
 
 if __name__ == "__main__":
     core = CoreManager()
     
-    # Boucle de test console
-    while True:
-        try:
-            user_input = input("\n>>> ")
-            if user_input.lower() in ['q', 'quit', 'exit']:
-                # On arrête proprement le thread audio avant de quitter
-                core.voice.stop_playback()
-                break
-            if user_input.strip():
-                core.process_input(user_input)
-        except KeyboardInterrupt:
-            core.voice.stop_playback()
-            break
+    # Boucle d'enregistrement (bloquante)
+    try:
+        core.recorder.start()
+    except KeyboardInterrupt:
+        core.voice.stop_playback()
