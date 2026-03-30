@@ -1,5 +1,6 @@
 from langgraph.prebuilt import create_react_agent
 from .ollama_provider import OllamaProvider
+from .tools.time_tool import get_temporal_context
 
 class AgentBrain:
     def __init__(self, provider=None):
@@ -18,7 +19,7 @@ class AgentBrain:
             
         self.agent = create_react_agent(
             provider.get_model(),
-            tools=[],
+            tools=[get_temporal_context],
             prompt=system_message
         )
 

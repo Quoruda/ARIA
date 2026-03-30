@@ -21,17 +21,21 @@ class CoreManager:
         
         # 1. Select Brain Provider via .env
         source = os.getenv("ARIA_AI_SOURCE", "ollama").lower()
+        temperature = float(os.getenv("ARIA_TEMPERATURE", "0.4"))
+
         if source == "mistral":
-            print("Mode: Mistral AI API")
+            print(f"Mode: Mistral AI API (temp: {temperature})")
             provider = MistralProvider(
                 model_id=os.getenv("MISTRAL_MODEL_ID", "mistral-small-latest"),
-                api_key=os.getenv("MISTRAL_API_KEY")
+                api_key=os.getenv("MISTRAL_API_KEY"),
+                temperature=temperature
             )
         else:
-            print(f"Mode: Ollama ({os.getenv('OLLAMA_MODEL_ID', 'mistral-nemo:12b')})")
+            print(f"Mode: Ollama ({os.getenv('OLLAMA_MODEL_ID', 'mistral-nemo:12b')}, temp: {temperature})")
             provider = OllamaProvider(
                 model_id=os.getenv("OLLAMA_MODEL_ID", "mistral-nemo:12b"),
-                host=os.getenv("OLLAMA_HOST")
+                host=os.getenv("OLLAMA_HOST"),
+                temperature=temperature
             )
             
         self.brain = AgentBrain(provider=provider)
