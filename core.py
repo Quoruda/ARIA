@@ -97,69 +97,102 @@ class CoreManager:
 
     def _handle_trigger_prompt(self, text: str):
         """Internal callback used by TriggerEngine."""
-        self.handle_prompt(text, source="trigger")
+        self.handle_trigger_prompt(text)
+
+    def handle_user_prompt(self, text: str):
+        """Handle user input from STT or terminal."""
+        print(f"\n💬 You: {text}")
+        threading.Thread(target=self._think_and_stream_user, args=(text,), daemon=True).start()
+
+    def handle_trigger_prompt(self, text: str):
+        """Handle trigger execution from TriggerEngine."""
+        logging.info(f"Processing trigger: {text}")
+        threading.Thread(target=self._think_and_stream_trigger, args=(text,), daemon=True).start()
 
     def handle_prompt(self, text: str, source: str = "user"):
         """Unified entry point to process any prompt (user or trigger)."""
         if source == "user":
-            print(f"\n💬 You: {text}")
+            self.handle_user_prompt(text)
         else:
-            logging.info(f"Processing trigger: {text}")
-
-        threading.Thread(target=self._think_and_stream, args=(text,), daemon=True).start()
+            self.handle_trigger_prompt(text)
 
     def process_input(self, user_text: str):
         """Backward-compatible wrapper for STT callback."""
-        self.handle_prompt(user_text, source="user")
+        self.handle_user_prompt(user_text)
 
-    def _think_and_stream(self, user_text: str):
-        """
-        Retrieves words one by one, builds sentences, and sends them to the voice module.
-        """
+    def _think_and_stream_user(self, user_text: str):
+        """Stream response for user prompts."""
         self._is_generating = True
         try:
             sentence_buffer = ""
             print("🔊 ARIA: ", end="", flush=True)
 
-            # Regex to detect the end of a sentence (. ! ? followed by a space or end of line)
             sentence_end_pattern = re.compile(r'([.!?]+(?:\s+|$))')
 
-            # 1. Read the Agent's stream word by word
             for word in self.brain.get_stream_response(user_text):
                 print(word, end="", flush=True)
                 sentence_buffer += word
 
-                # 2. Check if we have a complete sentence
                 match = sentence_end_pattern.search(sentence_buffer)
                 if match:
-                    # Extract the full sentence
                     end_index = match.end()
                     phrase_to_speak = sentence_buffer[:end_index].strip()
 
-                    # --- IMPROVED CLEANING FILTER ---
-                    # 1. Remove markers like "Speaking:", "Thinking:", etc.
                     phrase_propre = re.sub(r'(?i)\b(speaking|thinking|processing|outputting)\b[:.]*\s*', '', phrase_to_speak)
-                    # 2. Remove anything between asterisks (roleplay text like *hums softly*)
                     phrase_propre = re.sub(r'\*[^*]+\*', '', phrase_propre)
-                    # 3. Clean up remaining asterisks and extra spaces
                     phrase_propre = phrase_propre.replace('*', '').strip()
 
-                    # Send to audio generation!
-                    if len(phrase_propre) > 1:
-                        if self.voice is not None:
-                            self.voice.generate_audio(phrase_propre)
+                    if len(phrase_propre) > 1 and self.voice is not None:
+                        self.voice.generate_audio(phrase_propre)
 
-                    # Keep the rest (if there are words after the punctuation)
                     sentence_buffer = sentence_buffer[end_index:]
 
-            # 3. Finally, send whatever remains in the buffer (if there was no trailing punctuation)
             if sentence_buffer.strip():
                 phrase_finale = re.sub(r'(?i)\b(speaking|thinking|processing|outputting)\b[:.]*\s*', '', sentence_buffer)
                 phrase_finale = re.sub(r'\*[^*]+\*', '', phrase_finale)
                 phrase_finale = phrase_finale.replace('*', '').strip()
-                if len(phrase_finale) > 1:
-                    if self.voice is not None:
-                        self.voice.generate_audio(phrase_finale)
+                if len(phrase_finale) > 1 and self.voice is not None:
+                    self.voice.generate_audio(phrase_finale)
+        finally:
+            self._is_generating = False
+            if self.text_mode:
+                print("\n💡 Type your message and press Enter (Ctrl+C to quit).", flush=True)
+            else:
+                print("\n💡 Press Ctrl+Alt to speak.", flush=True)
+
+    def _think_and_stream_trigger(self, user_text: str):
+        """Stream response for trigger execution (executes directly without reformulation)."""
+        self._is_generating = True
+        try:
+            sentence_buffer = ""
+            print("🔊 ARIA: ", end="", flush=True)
+
+            sentence_end_pattern = re.compile(r'([.!?]+(?:\s+|$))')
+
+            for word in self.brain.get_stream_response_trigger(user_text):
+                print(word, end="", flush=True)
+                sentence_buffer += word
+
+                match = sentence_end_pattern.search(sentence_buffer)
+                if match:
+                    end_index = match.end()
+                    phrase_to_speak = sentence_buffer[:end_index].strip()
+
+                    phrase_propre = re.sub(r'(?i)\b(speaking|thinking|processing|outputting)\b[:.]*\s*', '', phrase_to_speak)
+                    phrase_propre = re.sub(r'\*[^*]+\*', '', phrase_propre)
+                    phrase_propre = phrase_propre.replace('*', '').strip()
+
+                    if len(phrase_propre) > 1 and self.voice is not None:
+                        self.voice.generate_audio(phrase_propre)
+
+                    sentence_buffer = sentence_buffer[end_index:]
+
+            if sentence_buffer.strip():
+                phrase_finale = re.sub(r'(?i)\b(speaking|thinking|processing|outputting)\b[:.]*\s*', '', sentence_buffer)
+                phrase_finale = re.sub(r'\*[^*]+\*', '', phrase_finale)
+                phrase_finale = phrase_finale.replace('*', '').strip()
+                if len(phrase_finale) > 1 and self.voice is not None:
+                    self.voice.generate_audio(phrase_finale)
         finally:
             self._is_generating = False
             if self.text_mode:
