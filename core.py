@@ -3,9 +3,8 @@ import os
 import threading
 import logging
 import warnings
-import time
+import argparse
 from dotenv import load_dotenv
-from brain.triggers.scheduler import scheduler
 from brain.triggers.engine import TriggerEngine
 
 # Suppress HF Hub and other library warnings
@@ -18,8 +17,9 @@ from brain.mistral_provider import MistralProvider
 from tts.kokoro_voice import KokoroVoice
 
 class CoreManager:
-    def __init__(self):
+    def __init__(self, text_mode: bool = False):
         load_dotenv()
+        self.text_mode = text_mode
         print("--- System Initialization ---")
         
         # 1. Select Brain Provider via .env
@@ -42,35 +42,44 @@ class CoreManager:
             )
             
         self.brain = AgentBrain(provider=provider)
-        
-        # 2. Configure Voice via .env
-        self.voice = KokoroVoice(
-            lang_code=os.getenv("TTS_LANG", "f"), 
-            voice_name=os.getenv("TTS_VOICE", "ff_siwis"),
-            speed=float(os.getenv("TTS_SPEED", "1.0"))
-        )
-        
-        # Load voice model into memory and start playback stream
-        self.voice.load_model()
-        self.voice.start_playback() 
-        self._is_generating = False
-        
-        # 3. Configure Micro (STT)
-        from stt.micro_recorder import PushToTalkRecorder
-        from stt.whisper_faster import FasterWhisperTranscriber
-        stt_model = os.getenv("ARIA_STT_MODEL", "small")
-        stt_lang = os.getenv("ARIA_STT_LANG", "fr")
-        self.stt_engine = FasterWhisperTranscriber(model_name=stt_model, language=stt_lang)
-        self.recorder = PushToTalkRecorder(
-            transcriber=self.stt_engine,
-            on_transcription=self.process_input,
-            can_record=lambda: not self.is_busy()
-        )
 
-        # 4. Start Trigger Engine (replaces old trigger thread)
+        self._is_generating = False
+
+        if not self.text_mode:
+            # 2. Configure Voice via .env
+            self.voice = KokoroVoice(
+                lang_code=os.getenv("TTS_LANG", "f"),
+                voice_name=os.getenv("TTS_VOICE", "ff_siwis"),
+                speed=float(os.getenv("TTS_SPEED", "1.0"))
+            )
+
+            # Load voice model into memory and start playback stream
+            self.voice.load_model()
+            self.voice.start_playback()
+        else:
+            self.voice = None
+            print("Text mode enabled: TTS/STT disabled. Terminal input/output only.")
+
+        if not self.text_mode:
+            # 3. Configure Micro (STT)
+            from stt.micro_recorder import PushToTalkRecorder
+            from stt.whisper_faster import FasterWhisperTranscriber
+            stt_model = os.getenv("ARIA_STT_MODEL", "small")
+            stt_lang = os.getenv("ARIA_STT_LANG", "fr")
+            self.stt_engine = FasterWhisperTranscriber(model_name=stt_model, language=stt_lang)
+            self.recorder = PushToTalkRecorder(
+                transcriber=self.stt_engine,
+                on_transcription=self.process_input,
+                can_record=lambda: not self.is_busy()
+            )
+        else:
+            self.stt_engine = None
+            self.recorder = None
+
+        # 4. Start Trigger Engine
         self.trigger_engine = TriggerEngine(
             is_busy=self.is_busy,
-            process_prompt=self.handle_prompt,
+            process_prompt=self._handle_trigger_prompt,
         )
         self.trigger_engine.start()
 
@@ -78,7 +87,17 @@ class CoreManager:
 
     def is_busy(self):
         """Returns True if the AI is generating, speaking, or if the user is currently recording."""
-        return self._is_generating or self.voice.audio_queue.unfinished_tasks > 0 or self.recorder.is_recording
+        if self.text_mode:
+            return self._is_generating
+        return (
+            self._is_generating
+            or self.voice.audio_queue.unfinished_tasks > 0
+            or self.recorder.is_recording
+        )
+
+    def _handle_trigger_prompt(self, text: str):
+        """Internal callback used by TriggerEngine."""
+        self.handle_prompt(text, source="trigger")
 
     def handle_prompt(self, text: str, source: str = "user"):
         """Unified entry point to process any prompt (user or trigger)."""
@@ -86,6 +105,7 @@ class CoreManager:
             print(f"\n💬 You: {text}")
         else:
             logging.info(f"Processing trigger: {text}")
+
         threading.Thread(target=self._think_and_stream, args=(text,), daemon=True).start()
 
     def process_input(self, user_text: str):
@@ -126,7 +146,8 @@ class CoreManager:
 
                     # Send to audio generation!
                     if len(phrase_propre) > 1:
-                        self.voice.generate_audio(phrase_propre)
+                        if self.voice is not None:
+                            self.voice.generate_audio(phrase_propre)
 
                     # Keep the rest (if there are words after the punctuation)
                     sentence_buffer = sentence_buffer[end_index:]
@@ -137,17 +158,41 @@ class CoreManager:
                 phrase_finale = re.sub(r'\*[^*]+\*', '', phrase_finale)
                 phrase_finale = phrase_finale.replace('*', '').strip()
                 if len(phrase_finale) > 1:
-                    self.voice.generate_audio(phrase_finale)
+                    if self.voice is not None:
+                        self.voice.generate_audio(phrase_finale)
         finally:
             self._is_generating = False
-            print("\n💡 Press Ctrl+Alt to speak.", flush=True)
+            if self.text_mode:
+                print("\n💡 Type your message and press Enter (Ctrl+C to quit).", flush=True)
+            else:
+                print("\n💡 Press Ctrl+Alt to speak.", flush=True)
+
+    def run(self):
+        """Run the main input loop."""
+        if self.text_mode:
+            print("\n💡 Type your message and press Enter (Ctrl+C to quit).")
+            while True:
+                try:
+                    user_text = input("> ").strip()
+                except EOFError:
+                    return
+                if not user_text:
+                    continue
+                self.handle_prompt(user_text, source="user")
+        else:
+            # Blocking recording loop
+            try:
+                self.recorder.start()
+            except KeyboardInterrupt:
+                self.voice.stop_playback()
+
 
 if __name__ == "__main__":
-    core = CoreManager()
+    parser = argparse.ArgumentParser(description="ARIA")
+    parser.add_argument("--text", action="store_true", help="Run in text-only mode (no TTS/STT)")
+    args = parser.parse_args()
 
-    # Blocking recording loop
-    try:
-        core.recorder.start()
-    except KeyboardInterrupt:
-        core.voice.stop_playback()
-
+    # Env var also supported
+    env_text = os.getenv("ARIA_TEXT_MODE", "0").strip().lower() in ("1", "true", "yes", "on")
+    core = CoreManager(text_mode=args.text or env_text)
+    core.run()
