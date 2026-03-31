@@ -1,4 +1,3 @@
-import os
 from kokoro import KPipeline
 from tts.voice import Voice
 
@@ -26,14 +25,15 @@ class KokoroVoice(Voice):
 
     def generate_audio(self, text: str):
         """
-        Génère l'audio avec Kokoro et le délègue au système de lecture du parent.
+        Generates audio with Kokoro and delegates it to the parent playback system.
         """
         if self.pipeline is None:
             self.load_model()
 
-        # Kokoro découpe déjà nativement les phrases longues en générateurs
+        # Kokoro natively splits long sentences into generators
         generator = self.pipeline(text, voice=self.voice_name, speed=self.speed)
-        
+
         for _, _, audio_chunk in generator:
-            # On envoie le morceau au parent. Kokoro sort toujours du 24000 Hz.
+            # Send the chunk to parent. Kokoro always outputs 24000 Hz.
             self.add_to_queue(audio_chunk, 24000)
+
