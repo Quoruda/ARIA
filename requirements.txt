@@ -1,12 +1,24 @@
-pygame
-langchain-core
-langchain-ollama
-langchain-mistralai
-langgraph
-ollama
-mistralai
-sounddevice
-kokoro-onnx
-numpy
-python-dotenv
-kokoro
+# Core & UI
+pygame>=2.5.0
+python-dotenv>=1.0.0
+
+# Brain & LLM
+phidata>=2.0.0
+langchain-core>=0.1.0
+langchain-ollama>=0.1.0
+langchain-mistralai>=0.1.0
+langgraph>=0.1.0
+ollama>=0.1.0
+mistralai>=0.1.0
+
+# Voice (Text-to-Speech)
+kokoro-onnx>=0.1.0
+sounddevice>=0.4.6
+numpy>=1.24.0
+
+# Speech Recognition (Speech-to-Text)
+faster-whisper>=0.10.0
+
+# Optional: HuggingFace integration
+huggingface-hub>=0.20.0
+
