@@ -49,7 +49,6 @@ class CoreManager:
             # 2. Configure Voice via .env
             self.voice = KokoroVoice(
                 lang_code=os.getenv("TTS_LANG", "f"),
-                voice_name=os.getenv("TTS_VOICE", "ff_siwis"),
                 speed=float(os.getenv("TTS_SPEED", "1.0"))
             )
 
