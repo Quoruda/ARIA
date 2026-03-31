@@ -2,7 +2,7 @@ from tts.voice import Voice
 from kokoro import KPipeline
 
 class KokoroVoice(Voice):
-    def __init__(self, lang_code='f', voice_name='ff_siwis', speed=1.0):
+    def __init__(self, lang_code='a', voice_name='af_heart', speed=1.0):
         super().__init__() # Initializes the parent queue
         self.lang_code = lang_code
         self.voice_name = voice_name
