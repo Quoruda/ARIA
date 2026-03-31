@@ -28,7 +28,7 @@ class PushToTalkRecorder:
         self.can_record = can_record
 
     def _audio_callback(self, indata, frames, time_info, status):
-        """Met l'audio en file d'attente (callback très léger = pas de blocage)."""
+        """Non-blocking audio callback."""
         if status:
             print(f"⚠️ {status}", file=sys.stderr)
         if self.is_recording:
@@ -40,26 +40,24 @@ class PushToTalkRecorder:
             if self.can_record and not self.can_record():
                 return
             self.is_recording = True
-            print("\n🎙  Enregistrement en cours...", flush=True)
+            print("\n🎙  Recording in progress...", flush=True)
 
     def _on_release(self, key):
         self.pressed_keys.discard(key)
         if self.is_recording and not self.hotkey.issubset(self.pressed_keys):
             self.is_recording = False
-            # None agit comme un "signal de fin de phrase" pour le thread
             self.audio_queue.put(None) 
 
     def _process_queue(self):
-        """Worker Thread unique : lit la queue et transcrit de manière asynchrone."""
+        """Worker thread for asynchronous transcription."""
         buffer = []
         full_session_text = []
         current_frames = 0
 
         while self.running:
-            item = self.audio_queue.get() # Bloque jusqu'à recevoir de l'audio
+            item = self.audio_queue.get() 
 
             if item is None:
-                # Touche relâchée : On transcrit tout ce qu'il reste dans le buffer
                 if buffer:
                     audio_data = np.concatenate(buffer, axis=0).flatten()
                     text = self.transcriber.transcribe(audio_data)
@@ -74,14 +72,12 @@ class PushToTalkRecorder:
                 buffer.clear()
                 full_session_text.clear()
                 current_frames = 0
-                print("⏸️  Fin d'enregistrement.", flush=True)
+                print("⏸️  Recording stopped.", flush=True)
 
             else:
-                # Accumulation ultra rapide dans une liste
                 buffer.append(item)
                 current_frames += len(item)
 
-                # Si le buffer atteint la taille d'un "chunk" (ex: 3 secondes), on transcrit en direct
                 if current_frames >= self.chunk_size:
                     audio_data = np.concatenate(buffer, axis=0).flatten()
                     buffer.clear()
@@ -93,11 +89,11 @@ class PushToTalkRecorder:
                         full_session_text.append(text)
 
     def start(self):
-        """Démarre le thread de traitement et l'écoute du micro/clavier."""
+        """Starts the processing thread and microphone/keyboard listening."""
         worker = threading.Thread(target=self._process_queue, daemon=True)
         worker.start()
 
-        print("\n💡 Maintenez Ctrl+Alt pour dicter — Ctrl+C dans la console pour quitter\n")
+        print("\n💡 Hold Ctrl+Alt to dictate — Ctrl+C in console to quit\n")
 
         try:
             with sd.InputStream(
@@ -110,7 +106,7 @@ class PushToTalkRecorder:
                 with keyboard.Listener(on_press=self._on_press, on_release=self._on_release) as listener:
                     listener.join()
         except KeyboardInterrupt:
-            print("\n👋 Arrêt du programme.")
+            print("\n👋 Program stopped.")
         finally:
             self.running = False
 
@@ -121,7 +117,6 @@ if __name__ == "__main__":
     model_name = os.getenv("ARIA_STT_MODEL", "small")
     language = os.getenv("ARIA_STT_LANG", "fr")
     
-    # Injection de dépendance : On initialise le moteur et on le donne à l'enregistreur
     engine = FasterWhisperTranscriber(model_name=model_name, language=language)
     app = PushToTalkRecorder(transcriber=engine)
     app.start()
