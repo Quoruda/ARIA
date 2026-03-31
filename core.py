@@ -3,7 +3,10 @@ import os
 import threading
 import logging
 import warnings
+import time
 from dotenv import load_dotenv
+from brain.triggers.scheduler import scheduler
+from brain.triggers.engine import TriggerEngine
 
 # Suppress HF Hub and other library warnings
 logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
@@ -61,21 +64,33 @@ class CoreManager:
         self.recorder = PushToTalkRecorder(
             transcriber=self.stt_engine,
             on_transcription=self.process_input,
-            can_record=lambda: not self.is_aria_speaking()
+            can_record=lambda: not self.is_busy()
         )
+
+        # 4. Start Trigger Engine (replaces old trigger thread)
+        self.trigger_engine = TriggerEngine(
+            is_busy=self.is_busy,
+            process_prompt=self.handle_prompt,
+        )
+        self.trigger_engine.start()
+
         print("--- System Ready ---")
 
-    def is_aria_speaking(self):
-        """Returns True if the AI is generating text or if the audio queue is still playing."""
-        return self._is_generating or self.voice.audio_queue.unfinished_tasks > 0
+    def is_busy(self):
+        """Returns True if the AI is generating, speaking, or if the user is currently recording."""
+        return self._is_generating or self.voice.audio_queue.unfinished_tasks > 0 or self.recorder.is_recording
+
+    def handle_prompt(self, text: str, source: str = "user"):
+        """Unified entry point to process any prompt (user or trigger)."""
+        if source == "user":
+            print(f"\n💬 You: {text}")
+        else:
+            logging.info(f"Processing trigger: {text}")
+        threading.Thread(target=self._think_and_stream, args=(text,), daemon=True).start()
 
     def process_input(self, user_text: str):
-        """
-        Receives user input and starts the thinking process in a thread
-        to avoid blocking the interface.
-        """
-        print(f"\n💬 You: {user_text}")
-        threading.Thread(target=self._think_and_stream, args=(user_text,), daemon=True).start()
+        """Backward-compatible wrapper for STT callback."""
+        self.handle_prompt(user_text, source="user")
 
     def _think_and_stream(self, user_text: str):
         """
@@ -85,22 +100,22 @@ class CoreManager:
         try:
             sentence_buffer = ""
             print("🔊 ARIA: ", end="", flush=True)
-            
+
             # Regex to detect the end of a sentence (. ! ? followed by a space or end of line)
             sentence_end_pattern = re.compile(r'([.!?]+(?:\s+|$))')
 
             # 1. Read the Agent's stream word by word
             for word in self.brain.get_stream_response(user_text):
-                print(word, end="", flush=True) # Console output
+                print(word, end="", flush=True)
                 sentence_buffer += word
-                
+
                 # 2. Check if we have a complete sentence
                 match = sentence_end_pattern.search(sentence_buffer)
                 if match:
                     # Extract the full sentence
                     end_index = match.end()
                     phrase_to_speak = sentence_buffer[:end_index].strip()
-                    
+
                     # --- IMPROVED CLEANING FILTER ---
                     # 1. Remove markers like "Speaking:", "Thinking:", etc.
                     phrase_propre = re.sub(r'(?i)\b(speaking|thinking|processing|outputting)\b[:.]*\s*', '', phrase_to_speak)
@@ -108,11 +123,11 @@ class CoreManager:
                     phrase_propre = re.sub(r'\*[^*]+\*', '', phrase_propre)
                     # 3. Clean up remaining asterisks and extra spaces
                     phrase_propre = phrase_propre.replace('*', '').strip()
-                    
+
                     # Send to audio generation!
                     if len(phrase_propre) > 1:
                         self.voice.generate_audio(phrase_propre)
-                    
+
                     # Keep the rest (if there are words after the punctuation)
                     sentence_buffer = sentence_buffer[end_index:]
 
@@ -125,13 +140,14 @@ class CoreManager:
                     self.voice.generate_audio(phrase_finale)
         finally:
             self._is_generating = False
-            print("\n💡 Appuyez sur Ctrl+Alt pour parler.", flush=True)
+            print("\n💡 Press Ctrl+Alt to speak.", flush=True)
 
 if __name__ == "__main__":
     core = CoreManager()
-    
-    # Boucle d'enregistrement (bloquante)
+
+    # Blocking recording loop
     try:
         core.recorder.start()
     except KeyboardInterrupt:
         core.voice.stop_playback()
+

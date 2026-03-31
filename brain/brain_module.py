@@ -1,6 +1,7 @@
 from langgraph.prebuilt import create_react_agent
 from .ollama_provider import OllamaProvider
 from .tools.time_tool import get_temporal_context
+from .tools.trigger_tool import schedule_action
 
 class AgentBrain:
     def __init__(self, provider=None):
@@ -11,15 +12,16 @@ class AgentBrain:
             provider = OllamaProvider()
             
         system_message = (
-            "You are a sophisticated AI interface with a pixel-art face.\n"
+            "You are ARIA, a sophisticated AI interface with a pixel-art face.\n"
             "Provide concise and helpful responses.\n"
             "Your personality is sleek, efficient, and slightly futuristic.\n"
-            "Respond ONLY with direct spoken text. DO NOT use markers like 'Thinking...', 'Speaking:', or descriptions between asterisks."
+            "Respond ONLY with direct spoken text. DO NOT use markers like 'Thinking...', 'Speaking:', or descriptions between asterisks.\n"
+            "Use 'schedule_action' for future reminders or tasks. Format: '+10m', '+1h', or 'HH:MM'."
         )
             
         self.agent = create_react_agent(
             provider.get_model(),
-            tools=[get_temporal_context],
+            tools=[get_temporal_context, schedule_action],
             prompt=system_message
         )
 
