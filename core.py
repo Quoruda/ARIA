@@ -5,7 +5,7 @@ import logging
 import warnings
 import argparse
 from dotenv import load_dotenv
-from brain.triggers.engine import TriggerEngine
+from triggers.engine import TriggerEngine
 
 # Suppress HF Hub and other library warnings
 logging.getLogger("huggingface_hub").setLevel(logging.ERROR)

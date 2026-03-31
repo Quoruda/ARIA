@@ -4,7 +4,7 @@ Specialized trigger types (time-based, event-based, etc.) have their own tool fi
 """
 
 import logging
-from brain.triggers.scheduler import scheduler
+from triggers.scheduler import scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ def schedule_action(time_str: str, action_prompt: str, context: str = None):
     :param action_prompt: Instruction to run when the trigger fires
     :param context: Optional context
     """
-    from brain.tools.time_trigger_tool import schedule_at_time, schedule_in_delay
+    from tools.time_trigger_tool import schedule_at_time, schedule_in_delay
 
     if not action_prompt or not action_prompt.strip():
         return "❌ Action prompt cannot be empty."

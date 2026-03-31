@@ -1,7 +1,7 @@
 from langgraph.prebuilt import create_react_agent
 from .ollama_provider import OllamaProvider
-from .tools.time_tool import get_temporal_context
-from .tools.trigger_tool import schedule_action
+from tools.time_tool import get_temporal_context
+from tools.trigger_tool import schedule_action
 
 class AgentBrain:
     def __init__(self, provider=None):

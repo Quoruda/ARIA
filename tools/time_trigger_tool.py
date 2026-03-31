@@ -6,8 +6,8 @@ These tools are specific to scheduling actions at specific times or delays.
 import logging
 from datetime import datetime, timedelta
 import re
-from brain.triggers.scheduler import scheduler
-from brain.triggers.time_trigger import TimeTrigger
+from triggers.scheduler import scheduler
+from triggers.time_trigger import TimeTrigger
 
 logger = logging.getLogger(__name__)
 

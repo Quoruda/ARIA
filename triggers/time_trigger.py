@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 import logging
-from brain.triggers.base_trigger import BaseTrigger
+from triggers.base_trigger import BaseTrigger
 
 logger = logging.getLogger(__name__)
 

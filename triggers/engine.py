@@ -3,7 +3,7 @@ import threading
 import time
 from typing import Callable
 
-from brain.triggers.scheduler import scheduler
+from triggers.scheduler import scheduler
 
 logger = logging.getLogger(__name__)
 

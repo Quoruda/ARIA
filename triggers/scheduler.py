@@ -1,6 +1,6 @@
 import logging
 from threading import Lock
-from brain.triggers.base_trigger import BaseTrigger
+from triggers.base_trigger import BaseTrigger
 
 logger = logging.getLogger(__name__)
 
