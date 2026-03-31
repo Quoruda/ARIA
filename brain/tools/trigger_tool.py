@@ -83,4 +83,26 @@ def delete_triggers_by_prompt(prompt_substring: str):
     return f"✅ {deleted_count} trigger(s) deleted."
 
 
+def schedule_action(time_str: str, action_prompt: str, context: str = None):
+    """Backward-compatible wrapper for time-based scheduling.
 
+    Historically this lived in trigger_tool. We now delegate to the specialized
+    time trigger tools but keep this wrapper to avoid breaking imports.
+
+    :param time_str: 'HH:MM' or '+Xm' / '+Xh'
+    :param action_prompt: Instruction to run when the trigger fires
+    :param context: Optional context
+    """
+    from brain.tools.time_trigger_tool import schedule_at_time, schedule_in_delay
+
+    if not action_prompt or not action_prompt.strip():
+        return "❌ Action prompt cannot be empty."
+
+    time_str = (time_str or "").strip()
+    if not time_str:
+        return "❌ Time string cannot be empty."
+
+    if time_str.startswith("+"):
+        return schedule_in_delay(time_str, action_prompt, context)
+
+    return schedule_at_time(time_str, action_prompt, context)

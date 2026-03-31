@@ -1,5 +1,5 @@
-from kokoro import KPipeline
 from tts.voice import Voice
+from kokoro import KPipeline
 
 class KokoroVoice(Voice):
     def __init__(self, lang_code='f', voice_name='ff_siwis', speed=1.0):
@@ -10,23 +10,24 @@ class KokoroVoice(Voice):
         self.pipeline = None
 
     def load_model(self):
-        """
-        Loads the Kokoro model, explicitly forcing CPU device.
-        """
+        """Load the Kokoro model (CPU-only)."""
         print(f"Loading Kokoro model (lang={self.lang_code}) on CPU...")
-        
-        # device='cpu' ensures it runs on CPU
-        self.pipeline = KPipeline(lang_code=self.lang_code, device='cpu')
-        
+
+        try:
+            # device='cpu' ensures it runs on CPU
+            self.pipeline = KPipeline(lang_code=self.lang_code, device='cpu')
+        except NameError as e:
+            raise RuntimeError(
+                "KPipeline is not available. Ensure the 'kokoro' package is installed and exports KPipeline."
+            ) from e
+
         print("Kokoro model loaded!")
 
     def unload_model(self):
         self.pipeline = None
 
     def generate_audio(self, text: str):
-        """
-        Generates audio with Kokoro and delegates it to the parent playback system.
-        """
+        """Generate audio with Kokoro and enqueue it for playback."""
         if self.pipeline is None:
             self.load_model()
 
@@ -34,6 +35,5 @@ class KokoroVoice(Voice):
         generator = self.pipeline(text, voice=self.voice_name, speed=self.speed)
 
         for _, _, audio_chunk in generator:
-            # Send the chunk to parent. Kokoro always outputs 24000 Hz.
+            # Kokoro always outputs 24000 Hz.
             self.add_to_queue(audio_chunk, 24000)
-
