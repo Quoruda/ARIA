@@ -1,8 +1,10 @@
 from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.memory import MemorySaver
 from .ollama_provider import OllamaProvider
 from .mistral_provider import MistralProvider
 from tools.time_tool import get_temporal_context
 from tools.trigger_tool import schedule_action
+
 
 class AgentBrain:
     @classmethod
@@ -39,6 +41,7 @@ class AgentBrain:
             provider = OllamaProvider()
 
         self.provider = provider
+        self._memory = MemorySaver()
 
         self.system_message = (
             "You are ARIA, a sophisticated AI interface with a pixel-art face.\n"
@@ -60,7 +63,8 @@ class AgentBrain:
         self.agent = create_react_agent(
             provider.get_model(),
             tools=[get_temporal_context, schedule_action],
-            prompt=self.system_message
+            prompt=self.system_message,
+            checkpointer=self._memory
         )
 
     def get_response(self, user_input: str):
@@ -68,7 +72,8 @@ class AgentBrain:
         Sends user input to the agent and returns the response.
         """
         inputs = {"messages": [("user", user_input)]}
-        response = self.agent.invoke(inputs)
+        config = {"configurable": {"thread_id": "main"}}
+        response = self.agent.invoke(inputs, config=config)
         return response["messages"][-1].content
     
     def get_stream_response(self, user_input: str):
@@ -77,7 +82,8 @@ class AgentBrain:
         Normal user prompt.
         """
         inputs = {"messages": [("user", user_input)]}
-        for event in self.agent.stream(inputs, stream_mode="messages"):
+        config = {"configurable": {"thread_id": "main"}}
+        for event in self.agent.stream(inputs, stream_mode="messages", config=config):
             message, metadata = event
             if message.content and metadata.get("langgraph_node") == "agent":
                 yield message.content
