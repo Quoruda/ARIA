@@ -1,8 +1,23 @@
 import threading
 import queue
 import sounddevice as sd
+import os
 
 class Voice:
+    @classmethod
+    def from_env(cls) -> "Voice":
+        """Factory method to create the correct voice instance based on ENV."""
+        # For now, Kokoro is our only implementation. 
+        # In the future, we could check an env var here to return different subclasses.
+        from tts.kokoro_voice import KokoroVoice
+        instance = KokoroVoice(
+            lang_code=os.getenv("TTS_LANG", "f"),
+            speed=float(os.getenv("TTS_SPEED", "1.0"))
+        )
+        instance.load_model()
+        instance.start_playback()
+        return instance
+
     def __init__(self):
         # --- STREAMING PLAYBACK SYSTEM (Common to all voices) ---
         self.audio_queue = queue.Queue()

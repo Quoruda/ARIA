@@ -1,9 +1,36 @@
 from langgraph.prebuilt import create_react_agent
 from .ollama_provider import OllamaProvider
+from .mistral_provider import MistralProvider
 from tools.time_tool import get_temporal_context
 from tools.trigger_tool import schedule_action
 
 class AgentBrain:
+    @classmethod
+    def from_env(cls) -> "AgentBrain":
+        """Reads AI provider configuration from environment variables and returns a ready AgentBrain."""
+        import os
+        source = os.getenv("AI_SOURCE", "ollama").lower()
+        temperature = float(os.getenv("TEMPERATURE", "0.4"))
+
+        if source == "mistral":
+            print(f"Mode: Mistral AI API (temp: {temperature})")
+            provider = MistralProvider(
+                model_id=os.getenv("AI_MODEL_ID", "mistral-small-latest"),
+                api_key=os.getenv("MISTRAL_API_KEY"),
+                temperature=temperature
+            )
+        else:
+            model_id = os.getenv("AI_MODEL_ID", "mistral-nemo:12b")
+            print(f"Mode: Ollama ({model_id}, temp: {temperature})")
+            provider = OllamaProvider(
+                model_id=model_id,
+                host=os.getenv("OLLAMA_HOST"),
+                temperature=temperature
+            )
+
+        return cls(provider=provider)
+
+
     def __init__(self, provider=None):
         """
         Initializes the AI agent using LangGraph and a provided model provider.

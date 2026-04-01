@@ -13,6 +13,15 @@ from stt.transcriber import BaseTranscriber
 from stt.whisper_faster import FasterWhisperTranscriber
 
 class PushToTalkRecorder:
+    @classmethod
+    def from_env(cls, on_transcription=None, can_record=None) -> "PushToTalkRecorder":
+        """Reads STT configuration from environment variables and returns a ready PushToTalkRecorder."""
+        import os
+        model_name = os.getenv("STT_MODEL", "small")
+        language = os.getenv("STT_LANG", "fr")
+        transcriber = FasterWhisperTranscriber(model_name=model_name, language=language)
+        return cls(transcriber=transcriber, on_transcription=on_transcription, can_record=can_record)
+
     def __init__(self, transcriber: BaseTranscriber, sample_rate=16000, chunk_seconds=3, on_transcription=None, can_record=None):
         self.transcriber = transcriber
         self.sample_rate = sample_rate
