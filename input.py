@@ -1,3 +1,4 @@
+import sys
 from typing import Callable, Optional
 from stt.micro_recorder import PushToTalkRecorder
 from tts.voice import Voice
@@ -35,6 +36,7 @@ class InputManager:
     def run(self):
         """Starts the main input loop (text terminal or microphone)."""
         if self.mode == "text":
+            sys.stdin.reconfigure(encoding='utf-8')
             print("\n💡 Type your message and press Enter (Ctrl+C to quit).")
             while True:
                 try:
