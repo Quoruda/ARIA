@@ -1,5 +1,6 @@
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.messages import trim_messages, SystemMessage
 from .ollama_provider import OllamaProvider
 from .mistral_provider import MistralProvider
 from tools.time_tool import get_temporal_context
@@ -13,9 +14,10 @@ class AgentBrain:
         import os
         source = os.getenv("AI_SOURCE", "ollama").lower()
         temperature = float(os.getenv("TEMPERATURE", "0.4"))
+        max_messages = int(os.getenv("MEMORY_MAX_MESSAGES", "20"))
 
         if source == "mistral":
-            print(f"Mode: Mistral AI API (temp: {temperature})")
+            print(f"Mode: Mistral AI API (temp: {temperature}, memory: {max_messages} msgs)")
             provider = MistralProvider(
                 model_id=os.getenv("AI_MODEL_ID", "mistral-small-latest"),
                 api_key=os.getenv("MISTRAL_API_KEY"),
@@ -23,17 +25,17 @@ class AgentBrain:
             )
         else:
             model_id = os.getenv("AI_MODEL_ID", "mistral-nemo:12b")
-            print(f"Mode: Ollama ({model_id}, temp: {temperature})")
+            print(f"Mode: Ollama ({model_id}, temp: {temperature}, memory: {max_messages} msgs)")
             provider = OllamaProvider(
                 model_id=model_id,
                 host=os.getenv("OLLAMA_HOST"),
                 temperature=temperature
             )
 
-        return cls(provider=provider)
+        return cls(provider=provider, max_messages=max_messages)
 
 
-    def __init__(self, provider=None):
+    def __init__(self, provider=None, max_messages=20):
         """
         Initializes the AI agent using LangGraph and a provided model provider.
         """
@@ -41,6 +43,7 @@ class AgentBrain:
             provider = OllamaProvider()
 
         self.provider = provider
+        self.max_messages = max_messages
         self._memory = MemorySaver()
 
         self.system_message = (
@@ -51,6 +54,20 @@ class AgentBrain:
             "Use 'schedule_action' for future reminders or tasks. Format: '+10m', '+1h', or 'HH:MM'.\n"
             "IMPORTANT: If the user asks for a reminder, clearly specify it in the action_prompt in the user's language (e.g., 'Rappelle à l'utilisateur de...'). Do not use raw actions like 'acheter du lait' for reminders."
         )
+
+        # Functional prompt logic to trim messages while keeping the system prompt
+        def state_modifier(state):
+            messages = state["messages"]
+            # We trim the history to the last N messages
+            trimmed_messages = trim_messages(
+                messages,
+                strategy="last",
+                token_counter=len, # Count by message count, not actual tokens
+                max_tokens=self.max_messages,
+                start_on="human",
+                include_system=False, # We'll re-add ours manually
+            )
+            return [SystemMessage(content=self.system_message)] + trimmed_messages
 
         self.trigger_system_message = (
             self.system_message + "\n\n"
@@ -63,7 +80,7 @@ class AgentBrain:
         self.agent = create_react_agent(
             provider.get_model(),
             tools=[get_temporal_context, schedule_action],
-            prompt=self.system_message,
+            prompt=state_modifier,
             checkpointer=self._memory
         )
 
