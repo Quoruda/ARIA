@@ -1,5 +1,5 @@
 from langgraph.prebuilt import create_react_agent
-from langgraph.checkpoint.memory import MemorySaver
+from memory.context_provider import get_context_checkpointer
 from langchain_core.messages import trim_messages, SystemMessage
 from .ollama_provider import OllamaProvider
 from .mistral_provider import MistralProvider
@@ -44,7 +44,7 @@ class AgentBrain:
 
         self.provider = provider
         self.max_messages = max_messages
-        self._memory = MemorySaver()
+        self._memory = get_context_checkpointer()
 
         self.system_message = (
             "You are ARIA, a sophisticated AI interface with a pixel-art face.\n"
