@@ -4,6 +4,7 @@ from langchain_core.messages import trim_messages, SystemMessage
 from .ollama_provider import OllamaProvider
 from .mistral_provider import MistralProvider
 from tools.time_tool import get_temporal_context
+from tools.search_tool import search_tool
 from tools.trigger_tool import schedule_action
 
 
@@ -79,7 +80,7 @@ class AgentBrain:
 
         self.agent = create_react_agent(
             provider.get_model(),
-            tools=[get_temporal_context, schedule_action],
+            tools=[get_temporal_context, schedule_action, search_tool],
             prompt=state_modifier,
             checkpointer=self._memory
         )

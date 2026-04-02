@@ -3,6 +3,7 @@ import threading
 import logging
 import warnings
 from dotenv import load_dotenv
+load_dotenv()
 
 from triggers.engine import TriggerEngine
 from brain.brain_module import AgentBrain
@@ -17,7 +18,6 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 class CoreManager:
     def __init__(self):
-        load_dotenv()
         
         # Read modes from .env
         self.input_mode = os.getenv("INPUT_MODE", "audio").lower()
