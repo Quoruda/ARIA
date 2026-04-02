@@ -3,21 +3,6 @@ from tools.time_tool import get_temporal_context
 from tools.trigger_tool import schedule_action
 from brain.brain_module import AgentBrain
 
-_SYSTEM_PROMPT = (
-    "You are ARIA, a sophisticated AI interface with a pixel-art face.\n"
-    "Provide concise and helpful responses.\n"
-    "Your personality is sleek, efficient, and slightly futuristic.\n"
-    "Respond ONLY with direct spoken text. DO NOT use markers like 'Thinking...', "
-    "'Speaking:', '>', '💭', or descriptions between asterisks.\n"
-    "\n"
-    "IMPORTANT: This is a TRIGGER EXECUTION. "
-    "You are being invoked automatically to execute a scheduled task or reminder.\n"
-    "If the prompt asks to remind the user, address the user naturally and explicitly "
-    "deliver the reminder (e.g., 'C'est l'heure de...' or 'Je te rappelle de...').\n"
-    "Do not be overly robotic or brief. "
-    "Speak directly and cleanly without reformulating the core instruction or creating new tasks."
-)
-
 
 class TriggerAgent(AgentBrain):
     """
@@ -31,8 +16,8 @@ class TriggerAgent(AgentBrain):
             "Your personality is sleek, efficient, and slightly futuristic.\n"
             "Respond ONLY with direct spoken text. DO NOT use markers like 'Thinking...', "
             "'Speaking:', '>', '💭', or descriptions between asterisks.\n"
-            "\n"
-            "IMPORTANT: This is a TRIGGER EXECUTION. "
+            f"\nCRITICAL: You must ALWAYS respond in {self.target_language}, regardless of the language the user speaks.\n"
+            "\nIMPORTANT: This is a TRIGGER EXECUTION. "
             "You are being invoked automatically to execute a scheduled task or reminder.\n"
             "If the prompt asks to remind the user, address the user naturally and explicitly "
             "deliver the reminder (e.g., 'C'est l'heure de...' or 'Je te rappelle de...').\n"
@@ -40,7 +25,8 @@ class TriggerAgent(AgentBrain):
             "Speak directly and cleanly without reformulating the core instruction or creating new tasks."
         )
 
-    def __init__(self, provider):
+    def __init__(self, provider, target_language: str = "English"):
+        self.target_language = target_language
         super().__init__(
             provider=provider,
             tools=[get_temporal_context, schedule_action],
@@ -51,7 +37,8 @@ class TriggerAgent(AgentBrain):
     def from_env(cls) -> "TriggerAgent":
         source = os.getenv("AI_SOURCE", "ollama").lower()
         temperature = float(os.getenv("TEMPERATURE", "0.4"))
+        target_language = os.getenv("TARGET_LANGUAGE", "French")
 
         provider = AgentBrain.build_provider(source, temperature)
-        print(f"[TriggerAgent] Provider: {source.capitalize()} | temp: {temperature}")
-        return cls(provider=provider)
+        print(f"[TriggerAgent] Provider: {source.capitalize()} | temp: {temperature} | language: {target_language}")
+        return cls(provider=provider, target_language=target_language)
