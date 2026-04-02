@@ -1,5 +1,5 @@
 import os
-from tools.time_tool import get_temporal_context
+from datetime import datetime
 from tools.search_tool import search_tool
 from tools.trigger_tool import schedule_action
 from brain.brain_module import AgentBrain
@@ -24,8 +24,10 @@ class DefaultAgent(AgentBrain):
     """
 
     def get_system_prompt(self) -> str:
+        current_time = datetime.now().strftime("%A %d %B %Y %H:%M")
         return (
             "You are ARIA, a sophisticated AI interface with a pixel-art face.\n"
+            f"Current time: {current_time}\n"
             "Provide concise and helpful responses.\n"
             "Your personality is sleek, efficient, and slightly futuristic.\n"
             "Respond ONLY with direct spoken text. DO NOT use markers like 'Thinking...', "
@@ -40,7 +42,7 @@ class DefaultAgent(AgentBrain):
     def __init__(self, provider, max_messages: int = 20):
         super().__init__(
             provider=provider,
-            tools=[get_temporal_context, schedule_action, search_tool],
+            tools=[schedule_action, search_tool],
             use_memory=True,
             thread_id="main",
             max_messages=max_messages,
