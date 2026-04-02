@@ -7,7 +7,7 @@ class Voice:
     @classmethod
     def from_env(cls) -> "Voice":
         """Factory method to create the correct voice instance based on ENV."""
-        # For now, Kokoro is our only implementation. 
+        # For now, Kokoro is our only implementation.
         # In the future, we could check an env var here to return different subclasses.
         from tts.kokoro_voice import KokoroVoice
         instance = KokoroVoice(
@@ -15,6 +15,42 @@ class Voice:
             speed=float(os.getenv("TTS_SPEED", "1.0"))
         )
         instance.load_model()
+
+        # Output device selection (cross-platform):
+        # - Windows/macOS: rely on PortAudio default output (typically follows the OS default).
+        # - Linux: prefer the 'pulse' device when available (PipeWire/PulseAudio default sink).
+        # - Users can override via TTS_OUTPUT_DEVICE / AUDIO_OUTPUT_DEVICE (index or name).
+        output_device = os.getenv("TTS_OUTPUT_DEVICE") or os.getenv("AUDIO_OUTPUT_DEVICE")
+
+        if output_device is None or str(output_device).strip() == "":
+            # Only auto-pick on Linux; on Windows/macOS, default output is usually correct.
+            if os.name == "posix":
+                try:
+                    devices = sd.query_devices()
+                    has_pulse = any(
+                        isinstance(d.get("name"), str) and d["name"].lower() == "pulse"
+                        for d in devices
+                    )
+                    if has_pulse:
+                        output_device = "pulse"
+                except Exception:
+                    # If querying devices fails, just keep PortAudio defaults.
+                    output_device = None
+
+        if output_device is not None and str(output_device).strip() != "":
+            value = str(output_device).strip()
+            try:
+                # Accept either an integer device index...
+                sd.default.device = (sd.default.device[0], int(value))
+                print(f"[TTS] Using output device index: {int(value)}")
+            except ValueError:
+                # ...or a device name like 'pulse'.
+                sd.default.device = (sd.default.device[0], value)
+                print(f"[TTS] Using output device name: {value}")
+            except Exception as e:
+                # Don't crash the app if the override is invalid.
+                print(f"[TTS] Failed to set output device ({value}): {e}. Falling back to default.")
+
         instance.start_playback()
         return instance
 
@@ -46,15 +82,15 @@ class Voice:
         current_sr = None
         # Track if we need to force 48kHz resampling
         force_48k = False
-        
+
         while self.is_playing:
             try:
                 # We expect a tuple containing (audio_data, sample_rate)
                 audio_data, sample_rate = self.audio_queue.get(timeout=0.1)
-                
+
                 if audio_data is not None:
                     import numpy as np
-                    
+
                     if force_48k and sample_rate == 24000:
                         # Fast 2x upsampling by repeating samples
                         audio_data = np.repeat(audio_data, 2, axis=0)
@@ -64,9 +100,14 @@ class Voice:
                     if stream is None or current_sr != sample_rate:
                         if stream is not None:
                             stream.close()
-                            
+
                         try:
-                            stream = sd.OutputStream(samplerate=sample_rate, channels=1, dtype='float32')
+                            stream = sd.OutputStream(
+                                samplerate=sample_rate,
+                                channels=1,
+                                dtype='float32',
+                                device=sd.default.device[1],
+                            )
                             stream.start()
                             current_sr = sample_rate
                         except sd.PortAudioError as e:
@@ -76,18 +117,23 @@ class Voice:
                                 force_48k = True
                                 audio_data = np.repeat(audio_data, 2, axis=0)
                                 sample_rate = 48000
-                                stream = sd.OutputStream(samplerate=sample_rate, channels=1, dtype='float32')
+                                stream = sd.OutputStream(
+                                    samplerate=sample_rate,
+                                    channels=1,
+                                    dtype='float32',
+                                    device=sd.default.device[1],
+                                )
                                 stream.start()
                                 current_sr = sample_rate
                             else:
                                 raise e
-                        
+
                     # Flatten/reshape data to fit OutputStream
                     if isinstance(audio_data, np.ndarray) and len(audio_data.shape) == 1:
                         audio_data = np.expand_dims(audio_data, axis=-1)
-                    
+
                     stream.write(audio_data)
-                
+
                 self.audio_queue.task_done()
             except queue.Empty:
                 continue
@@ -100,7 +146,7 @@ class Voice:
                         pass
                     stream = None
                     current_sr = None
-                    
+
         # Cleanup
         if stream is not None:
             stream.stop()
@@ -116,7 +162,8 @@ class Voice:
 
     def unload_model(self):
         raise NotImplementedError
-    
+
     def generate_audio(self, text: str):
         """Generates audio and calls self.add_to_queue(audio, sr)"""
         raise NotImplementedError
+
