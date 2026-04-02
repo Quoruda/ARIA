@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from triggers.engine import TriggerEngine
-from brain.brain_module import AgentBrain
+from agents.default_agent import DefaultAgent
+from agents.trigger_agent import TriggerAgent
 from tts.tts import Voice
 from input import InputManager
 from output import OutputManager
@@ -25,8 +26,9 @@ class CoreManager:
         
         print(f"--- System Initialization (In: {self.input_mode}, Out: {self.output_mode}) ---")
 
-        # 1. Brain
-        self.brain = AgentBrain.from_env()
+        # 1. Brains
+        self.brain = DefaultAgent.from_env()
+        self.trigger_brain = TriggerAgent.from_env()
 
         # 2. Voice (TTS) — Loaded only if output is audio
         self.voice = Voice.from_env() if self.output_mode == "audio" else None
@@ -69,12 +71,12 @@ class CoreManager:
     def handle_user_prompt(self, text: str):
         """Handle user input from STT or terminal."""
         print(f"\n💬 You: {text}")
-        self.output.stream_async(self.brain.get_stream_response(text))
+        self.output.stream_async(self.brain.stream(text))
 
     def handle_trigger_prompt(self, text: str):
         """Handle trigger execution from TriggerEngine."""
         logging.info(f"Processing trigger: {text}")
-        self.output.stream_async(self.brain.get_stream_response_trigger(text))
+        self.output.stream_async(self.trigger_brain.stream(text))
 
     def run(self):
         """Run the main input loop."""
