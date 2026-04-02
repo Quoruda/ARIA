@@ -3,6 +3,7 @@ from langchain_core.messages import trim_messages, SystemMessage
 from memory.context_provider import get_context_checkpointer
 from .ollama_provider import OllamaProvider
 from .mistral_provider import MistralProvider
+from .kobold_provider import KoboldProvider
 
 
 class AgentBrain:
@@ -74,6 +75,12 @@ class AgentBrain:
             return MistralProvider(
                 model_id=os.getenv("AI_MODEL_ID", "mistral-small-latest"),
                 api_key=os.getenv("MISTRAL_API_KEY"),
+                temperature=temperature,
+            )
+        if source == "kobold":
+            return KoboldProvider(
+                model_id=os.getenv("AI_MODEL_ID", "local-model"),
+                url=os.getenv("KOBOLD_URL", "http://localhost:5001/v1"),
                 temperature=temperature,
             )
         return OllamaProvider(
