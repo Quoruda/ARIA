@@ -1,6 +1,7 @@
 # Core & UI
 pygame>=2.5.0
 python-dotenv>=1.0.0
+requests>=2.31.0
 
 # Brain & LLM
 langchain-core>=0.1.0
