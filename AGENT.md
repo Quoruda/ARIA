@@ -193,7 +193,12 @@ Current tools:
 - Keep business logic out of tools: tools should delegate to modules and return structured results.
 
 ## 🗺️ Roadmap (high-level)
-- Connect core state (thinking/speaking/working) to the pixel face animations.
+- Link `core.py` runtime states to Pygame face animations (Idle, Listening, Thinking, Speaking).
 - Add non-time triggers (event-based triggers).
 - Make trigger storage persistent (optional).
+- Create an interactive install/setup script (`setup_aria.py`) to generate and validate `.env`.
+- Add a Weather tool (Open-Meteo, no API key required).
+- Implement a "Visual Cortex" tool (screenshot capture + analysis via a sub-agent to protect VRAM).
+- Add basic system control tools (launch local apps and simple browser control).
+- Build an advanced persistent memory module (explicit note-taking tools and long-term user memory).
 - Expand the action/tooling layer (system automation) with safe permissions.
