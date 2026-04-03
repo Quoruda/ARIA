@@ -14,10 +14,10 @@ class AgentBrain:
     by calling super().__init__() with the appropriate arguments.
     """
 
-    def get_system_prompt(self) -> str:
+    def get_system_prompt(self, messages: list = None) -> str:
         """
         Returns the system prompt content. 
-        Subclasses should override this to provide dynamic content.
+        Subclasses should override this to provide dynamic content based on history.
         """
         return self.system_prompt
 
@@ -44,7 +44,7 @@ class AgentBrain:
 
         def _prompt_modifier(state):
             """Prepends the dynamic system message and trims history."""
-            content = self.get_system_prompt()
+            content = self.get_system_prompt(state.get("messages", []))
             
             trimmed = trim_messages(
                 state["messages"],
