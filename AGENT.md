@@ -71,8 +71,10 @@ ARIA has two distinct memory layers:
 - **SQLite context**: persistent conversation state via LangGraph checkpointing
 
 Implementation:
-- `memory/context_provider.py` selects the backend via `.env`.
-- `memory/ram_context.py` and `memory/sqlite_context.py` provide LangGraph checkpointers.
+- `memory/context_provider.py` selects and builds the checkpointer from `.env`.
+- The concrete checkpointers are instantiated there using LangGraph's built-ins:
+  - `langgraph.checkpoint.memory.MemorySaver` (RAM)
+  - `langgraph.checkpoint.sqlite.SqliteSaver` (SQLite)
 
 2) Scratchpad notes (simple user profile):
 - `memory/scratchpad.py` stores stable facts like Name/Location/Preferences.
@@ -86,8 +88,11 @@ The trigger system is decoupled from the UI and the LLM:
 - `triggers/engine.py`: background polling loop that dispatches due triggers
 
 Tools exposed to the LLM:
-- `tools/time_trigger_tool.py`: `schedule_at_time()`, `schedule_in_delay()`
-- `tools/trigger_tool.py`: list/delete triggers + `schedule_action()` wrapper
+- `triggers/time_trigger_tool.py`: `schedule_at_time()`, `schedule_in_delay()`
+- `triggers/trigger_tool.py`: list/delete triggers + `schedule_action()` wrapper
+
+Note:
+- Trigger-related tools live under `triggers/` (domain ownership). The `tools/` folder contains unrelated tools (search, weather, time context).
 
 ### 7. UI (Pixel Face) (`ui/`)
 This repo also includes a Pygame pixel-art face UI:
@@ -166,9 +171,9 @@ Current tools (see `tools/`):
   - `schedule_in_delay(delay_str, action_prompt, context=None)` where `delay_str` is `+10m` / `+2h`
   - `schedule_action(time_str, action_prompt, context=None)` backward-compatible wrapper
 - Trigger management:
-  - `list_all_triggers()` returns a structured list (ids + status)
-  - `delete_trigger(trigger_id)`
-  - `delete_triggers_by_prompt(prompt_substring)`
+  - `list_all_triggers()` returns a structured dict (ids + status + optional scheduled_time)
+  - `delete_trigger(trigger_id)` returns `{success, message}`
+  - `delete_triggers_by_prompt(prompt_substring)` returns `{success, deleted, message}`
 - Time context:
   - `get_temporal_context()`
 - Web search:

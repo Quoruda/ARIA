@@ -4,7 +4,7 @@ from datetime import datetime
 from brain.brain_module import AgentBrain
 from memory.scratchpad import ScratchpadManager, build_scratchpad_tools
 from tools.search_tool import search_tool
-from tools.trigger_tool import schedule_action
+from triggers.trigger_tool import schedule_action
 from tools.weather_tool import get_weather_forecast
 
 

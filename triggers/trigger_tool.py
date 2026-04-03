@@ -93,7 +93,7 @@ def schedule_action(time_str: str, action_prompt: str, context: str = None):
     :param action_prompt: Instruction to run when the trigger fires
     :param context: Optional context
     """
-    from tools.time_trigger_tool import schedule_at_time, schedule_in_delay
+    from triggers.time_trigger_tool import schedule_at_time, schedule_in_delay
 
     if not action_prompt or not action_prompt.strip():
         return "❌ Action prompt cannot be empty."

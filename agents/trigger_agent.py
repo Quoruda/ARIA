@@ -1,6 +1,6 @@
 import os
 from tools.time_tool import get_temporal_context
-from tools.trigger_tool import schedule_action
+from triggers.trigger_tool import schedule_action
 from brain.brain_module import AgentBrain
 
 
