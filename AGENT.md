@@ -1,13 +1,14 @@
 # 🤖 Agent Handbook - Project ARIA
 
-Welcome to the **ARIA** project (*AI Interface with a pixel-art face*). This document is designed to help you quickly understand the project architecture and how to contribute.
+Welcome to the **ARIA** project (*AI Interface with a pixel-art face*). This document is designed to help you quickly understand the project architecture, runtime modes, and contribution conventions.
 
 ## 🌟 Overview
 ARIA is a local-first AI interface featuring an animated pixel-art face. It combines:
-- A LangGraph ReAct agent backed by **Ollama** or **Mistral**
+- A LangGraph ReAct agent backed by **Ollama**, **Mistral**, or **Kobold**
 - Optional **speech recognition** (push-to-talk STT)
 - Optional **streaming speech synthesis** (TTS)
 - A lightweight **scheduled trigger engine** (reminders / delayed actions)
+- Optional **scratchpad memory** (simple JSON user profile notes)
 
 ## 🧭 Repository Conventions (important)
 - **All code, comments, docstrings, and identifiers must be in English.**
@@ -18,9 +19,9 @@ ARIA is a local-first AI interface featuring an animated pixel-art face. It comb
 
 ### 1. Core Orchestrator (`core.py`)
 `core.py` wires everything together:
-- Loads `.env`
+- Loads `.env` via `python-dotenv`
 - Selects **input** mode (text or audio) and **output** mode (text or audio)
-- Instantiates 2 brains:
+- Instantiates 2 agents:
   - `DefaultAgent` for user conversations
   - `TriggerAgent` for scheduled trigger execution
 - Starts the `TriggerEngine` in the background
@@ -34,6 +35,8 @@ Key principle: **Core routes work, it doesn’t decide behavior.**
 - `stt/micro_recorder.py` implements the push-to-talk recorder.
 - `stt/whisper_faster.py` provides Faster-Whisper transcription.
 
+Note: audio mode depends on system audio access (PortAudio via `sounddevice`).
+
 ### 3. Output (`output.py`, `tts/`)
 - `OutputManager` consumes the LLM token stream.
 - In `OUTPUT_MODE=audio`, it buffers sentences and sends them to TTS.
@@ -46,25 +49,34 @@ TTS stack:
 ### 4. Brain (LLM) (`brain/`, `agents/`)
 The agent framework is implemented with LangGraph:
 - `brain/brain_module.py`: `AgentBrain` base class (LangGraph ReAct agent)
-- `brain/ollama_provider.py`: Ollama model provider
-- `brain/mistral_provider.py`: Mistral model provider
+- Providers:
+  - `brain/ollama_provider.py`: Ollama model provider
+  - `brain/mistral_provider.py`: Mistral model provider
+  - `brain/kobold_provider.py`: OpenAI-compatible local endpoint provider
 
 Two concrete agents live in `agents/`:
 - `agents/default_agent.py`: main conversational assistant
-  - Uses **memory** (see `memory/`)
-  - Tools: trigger scheduling + web search
+  - Uses LangGraph checkpointer memory when enabled (see `memory/`)
+  - Optional persistent scratchpad notes (`SCRATCHPAD_PATH`)
+  - Tools: trigger scheduling + web search + weather + scratchpad
 - `agents/trigger_agent.py`: stateless execution agent for triggers
-  - No memory
+  - No conversation memory
   - Tools: temporal context + trigger scheduling
 
 ### 5. Memory & Persistence (`memory/`)
-ARIA can run with:
-- **RAM memory** (default): volatile, reset on restart
-- **SQLite memory**: persistent conversation state via LangGraph checkpointing
+ARIA has two distinct memory layers:
+
+1) Conversation state (LangGraph checkpointer):
+- **RAM context** (default): volatile, reset on restart
+- **SQLite context**: persistent conversation state via LangGraph checkpointing
 
 Implementation:
 - `memory/context_provider.py` selects the backend via `.env`.
 - `memory/ram_context.py` and `memory/sqlite_context.py` provide LangGraph checkpointers.
+
+2) Scratchpad notes (simple user profile):
+- `memory/scratchpad.py` stores stable facts like Name/Location/Preferences.
+- Enabled by setting `SCRATCHPAD_PATH` to a JSON file path.
 
 ### 6. Triggers (Scheduler) (`triggers/`, `tools/`)
 The trigger system is decoupled from the UI and the LLM:
@@ -85,57 +97,33 @@ This repo also includes a Pygame pixel-art face UI:
 
 Note: the UI can be run independently from the assistant core.
 
-## ⚙️ Configuration (.env reference)
-ARIA uses `python-dotenv` in `core.py`. Create a `.env` file at repo root.
+## ⚙️ Configuration
+ARIA uses `python-dotenv` in `core.py`.
 
-### Modes
-- `INPUT_MODE`:
-  - `text` (terminal input)
-  - `audio` (push-to-talk STT)
-  Default: `audio`
+- Use `.env.example` as the reference.
+- Create a local `.env` at repo root.
 
-- `OUTPUT_MODE`:
-  - `text` (print only)
-  - `audio` (streaming TTS)
-  Default: `audio`
-
-### LLM Provider
-- `AI_SOURCE`: `ollama` or `mistral` (default: `ollama`)
-- `AI_MODEL_ID`:
-  - For Ollama default is `mistral-nemo:12b`
-  - For Mistral default is `mistral-small-latest`
-- `OLLAMA_HOST`: optional (set if Ollama is remote)
-- `MISTRAL_API_KEY`: required when `AI_SOURCE=mistral`
-- `TEMPERATURE`: float (default: `0.4`)
-
-### Assistant language (spoken text)
-- `TARGET_LANGUAGE`: language the assistant must ALWAYS respond in (default: `English`)
-
-### Agent memory
-- `MEMORY_MAX_MESSAGES`: max message history fed to the agent (default: `20`)
-
-Memory backend selection:
-- `CONTEXT_BACKEND`: `ram` (default) or `sqlite`
-- `CONTEXT_DB_PATH`: path for SQLite DB (default: `data/context.db`)
-
-### Web search (optional)
-- `TAVILY_MAX_RESULTS`: integer (default: `4`)
-- `TAVILY_RETURN_METADATA`: `true`/`false` (default: `true`)
-
-Important: `tools/search_tool.py` uses `langchain_tavily`. If you enable/keep this tool,
-make sure the dependency is installed in your environment.
+Key variables (non-exhaustive):
+- Modes: `INPUT_MODE` (`text|audio`), `OUTPUT_MODE` (`text|audio`)
+- Provider: `AI_SOURCE` (`ollama|mistral|kobold`)
+- Model: `AI_MODEL_ID`
+- Provider-specific:
+  - `OLLAMA_HOST` (optional)
+  - `MISTRAL_API_KEY` (required if `AI_SOURCE=mistral`)
+  - `KOBOLD_URL` (required if `AI_SOURCE=kobold`)
+- Voice: `TTS_LANG`, `TTS_SPEED`, `TTS_OUTPUT_DEVICE` / `AUDIO_OUTPUT_DEVICE`
+- STT: `STT_MODEL`, `STT_LANG`
+- Conversation memory: `CONTEXT_BACKEND` (`ram|sqlite`), `CONTEXT_DB_PATH`
+- Scratchpad: `SCRATCHPAD_PATH`
+- Web search: requires `TAVILY_API_KEY`
 
 ## 🔐 Security & publishing checklist
 Before publishing this repository on GitHub:
 - **Never commit secrets**: API keys, tokens, private endpoints.
-  - Add `.env` to `.gitignore` and only commit a `.env.example`.
+  - Keep `.env` ignored and only commit `.env.example`.
   - Rotate any key that has been committed or shared.
 - If you enable Tavily search, keep `TAVILY_API_KEY` out of the repo.
 - If you use Mistral, keep `MISTRAL_API_KEY` out of the repo.
-
-Recommended files:
-- `.env.example` with safe defaults and empty placeholders
-- `README.md` section explaining how to configure keys locally
 
 ## 🚀 Installation
 ```bash
@@ -172,7 +160,7 @@ ARIA follows a strict separation of concerns:
 - **Tools are dumb** (they expose capabilities)
 - **The LLM decides** if/when/how to call them
 
-Current tools:
+Current tools (see `tools/`):
 - Trigger scheduling:
   - `schedule_at_time(time_str, action_prompt, context=None)` where `time_str` is `HH:MM`
   - `schedule_in_delay(delay_str, action_prompt, context=None)` where `delay_str` is `+10m` / `+2h`
@@ -184,11 +172,15 @@ Current tools:
 - Time context:
   - `get_temporal_context()`
 - Web search:
-  - Tavily search tool (see `tools/search_tool.py`)
+  - Tavily search tool (requires `TAVILY_API_KEY`) in `tools/search_tool.py`
+- Weather:
+  - Open-Meteo (no API key) via `get_weather_forecast(city, date_str="", country_code="")`
+- Scratchpad memory:
+  - `set_memory(key, value)` persists stable user info when `SCRATCHPAD_PATH` is set
 
 ## 🧪 Development notes
 - Prefer small, composable modules.
-- Keep the assistant personality in `agents/default_agent.py` and `agents/trigger_agent.py`.
+- Keep assistant personality in `agents/default_agent.py` and `agents/trigger_agent.py`.
 - Keep orchestration in `core.py`.
 - Keep business logic out of tools: tools should delegate to modules and return structured results.
 
@@ -197,8 +189,6 @@ Current tools:
 - Add non-time triggers (event-based triggers).
 - Make trigger storage persistent (optional).
 - Create an interactive install/setup script (`setup_aria.py`) to generate and validate `.env`.
-- Add a Weather tool (Open-Meteo, no API key required).
 - Implement a "Visual Cortex" tool (screenshot capture + analysis via a sub-agent to protect VRAM).
 - Add basic system control tools (launch local apps and simple browser control).
-- Build an advanced persistent memory module (explicit note-taking tools and long-term user memory).
 - Expand the action/tooling layer (system automation) with safe permissions.
