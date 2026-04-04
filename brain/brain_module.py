@@ -26,7 +26,6 @@ class AgentBrain:
         provider=None,
         system_prompt: str = "",
         tools: list = None,
-        use_memory: bool = False,
         thread_id: str = "default",
         max_messages: int = 20,
         checkpointer=None,
@@ -37,14 +36,9 @@ class AgentBrain:
         self.provider = provider
         self.system_prompt = system_prompt
         self.tools = tools or []
-        self.use_memory = use_memory
         self.thread_id = thread_id
         self.max_messages = max_messages
-
-        # Brain does not decide persistence; it only consumes an optional checkpointer.
-        # If use_memory is False, we always disable the checkpointer.
-        if not use_memory:
-            checkpointer = None
+        self.checkpointer = checkpointer
 
         def _prompt_modifier(state):
             """Prepends the dynamic system message and trims history."""
@@ -64,7 +58,7 @@ class AgentBrain:
             provider.get_model(),
             tools=self.tools,
             prompt=_prompt_modifier,
-            checkpointer=checkpointer,
+            checkpointer=self.checkpointer,
         )
 
     # ------------------------------------------------------------------ #
@@ -99,7 +93,9 @@ class AgentBrain:
     # ------------------------------------------------------------------ #
 
     def _make_config(self) -> dict:
-        return {"configurable": {"thread_id": self.thread_id}} if self.use_memory else {}
+        if self.checkpointer is None:
+            return {}
+        return {"configurable": {"thread_id": self.thread_id}}
 
     def get_response(self, user_input: str) -> str:
         """Invokes the agent and returns the final response as a string."""

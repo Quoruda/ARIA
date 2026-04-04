@@ -3,10 +3,23 @@ import pygame
 import random
 import os
 from pygame import Surface
-from pygame.locals import QUIT, KEYDOWN, K_ESCAPE, K_1, K_2, K_3, K_4, K_5, K_6, NOFRAME, MOUSEBUTTONDOWN, MOUSEBUTTONUP
+from pygame.locals import (
+    QUIT,
+    KEYDOWN,
+    K_ESCAPE,
+    K_1,
+    K_2,
+    K_3,
+    K_4,
+    K_5,
+    K_6,
+    NOFRAME,
+    MOUSEBUTTONDOWN,
+    MOUSEBUTTONUP,
+)
 
-from pixel_renderer import AnimatedFace, draw_loading, draw_exploding
-from window_manager import WindowManager
+from ui.pixel_renderer import AnimatedFace, draw_loading, draw_exploding
+from ui.window_manager import WindowManager
 
 # CONFIGURATION
 RENDER_W, RENDER_H = 1000, 1000

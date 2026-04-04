@@ -30,7 +30,9 @@ class TriggerAgent(AgentBrain):
         super().__init__(
             provider=provider,
             tools=[get_temporal_context, schedule_action],
-            use_memory=False,
+            thread_id="default",
+            max_messages=20,
+            checkpointer=None,
         )
 
     @classmethod

@@ -101,7 +101,6 @@ class DefaultAgent(AgentBrain):
         super().__init__(
             provider=provider,
             tools=[schedule_action, search_tool, get_weather_forecast, *scratchpad_tools],
-            use_memory=True,
             checkpointer=get_context_checkpointer(),
             thread_id="main",
             max_messages=max_messages,
