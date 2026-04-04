@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 
 from brain.brain_module import AgentBrain
+from memory.context_provider import get_context_checkpointer
 from memory.scratchpad import ScratchpadManager, build_scratchpad_tools
 from tools.search_tool import search_tool
 from triggers.trigger_tool import schedule_action
@@ -101,6 +102,7 @@ class DefaultAgent(AgentBrain):
             provider=provider,
             tools=[schedule_action, search_tool, get_weather_forecast, *scratchpad_tools],
             use_memory=True,
+            checkpointer=get_context_checkpointer(),
             thread_id="main",
             max_messages=max_messages,
         )

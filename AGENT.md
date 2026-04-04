@@ -49,6 +49,10 @@ TTS stack:
 ### 4. Brain (LLM) (`brain/`, `agents/`)
 The agent framework is implemented with LangGraph:
 - `brain/brain_module.py`: `AgentBrain` base class (LangGraph ReAct agent)
+
+Design note:
+- `brain/` does not import `memory/`. Persistence is configured at the agent/orchestration layer by injecting a LangGraph checkpointer (see `memory/context_provider.py`).
+
 - Providers:
   - `brain/ollama_provider.py`: Ollama model provider
   - `brain/mistral_provider.py`: Mistral model provider

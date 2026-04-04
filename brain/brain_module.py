@@ -1,6 +1,6 @@
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import trim_messages, SystemMessage
-from memory.context_provider import get_context_checkpointer
+
 from .ollama_provider import OllamaProvider
 from .mistral_provider import MistralProvider
 from .kobold_provider import KoboldProvider
@@ -16,7 +16,7 @@ class AgentBrain:
 
     def get_system_prompt(self, messages: list = None) -> str:
         """
-        Returns the system prompt content. 
+        Returns the system prompt content.
         Subclasses should override this to provide dynamic content based on history.
         """
         return self.system_prompt
@@ -29,6 +29,7 @@ class AgentBrain:
         use_memory: bool = False,
         thread_id: str = "default",
         max_messages: int = 20,
+        checkpointer=None,
     ):
         if provider is None:
             provider = OllamaProvider()
@@ -40,12 +41,15 @@ class AgentBrain:
         self.thread_id = thread_id
         self.max_messages = max_messages
 
-        checkpointer = get_context_checkpointer() if use_memory else None
+        # Brain does not decide persistence; it only consumes an optional checkpointer.
+        # If use_memory is False, we always disable the checkpointer.
+        if not use_memory:
+            checkpointer = None
 
         def _prompt_modifier(state):
             """Prepends the dynamic system message and trims history."""
             content = self.get_system_prompt(state.get("messages", []))
-            
+
             trimmed = trim_messages(
                 state["messages"],
                 strategy="last",
@@ -71,6 +75,7 @@ class AgentBrain:
     def build_provider(source: str, temperature: float):
         """Instantiates the right ModelProvider from a source string."""
         import os
+
         if source == "mistral":
             return MistralProvider(
                 model_id=os.getenv("AI_MODEL_ID", "mistral-small-latest"),
