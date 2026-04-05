@@ -71,12 +71,12 @@ class CoreManager:
     def handle_user_prompt(self, text: str):
         """Handle user input from STT or terminal."""
         print(f"\n💬 You: {text}")
-        self.output.stream_async(self.brain.stream(text))
+        self.output.stream_async(lambda: self.brain.stream(text))
 
     def handle_trigger_prompt(self, text: str):
         """Handle trigger execution from TriggerEngine."""
         logging.info(f"Processing trigger: {text}")
-        self.output.stream_async(self.trigger_brain.stream(text))
+        self.output.stream_async(lambda: self.trigger_brain.stream(text))
 
     def run(self):
         """Run the main input loop."""

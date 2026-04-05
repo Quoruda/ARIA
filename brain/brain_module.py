@@ -106,7 +106,20 @@ class AgentBrain:
     def stream(self, user_input: str):
         """Yields response chunks from the agent (streaming)."""
         inputs = {"messages": [("user", user_input)]}
-        for event in self._agent.stream(inputs, stream_mode="messages", config=self._make_config()):
-            message, metadata = event
-            if message.content and metadata.get("langgraph_node") == "agent":
-                yield message.content
+        last_content = ""
+
+        for event in self._agent.stream(inputs, config=self._make_config()):
+            # event is a dict with node names as keys, extract agent responses
+            if "agent" in event:
+                agent_state = event["agent"]
+                if isinstance(agent_state, dict) and "messages" in agent_state:
+                    # Only get the LAST message (the agent's response, not history)
+                    if agent_state["messages"]:
+                        msg = agent_state["messages"][-1]
+                        if hasattr(msg, "content") and msg.content:
+                            # Only yield the NEW content that wasn't yielded before
+                            if msg.content != last_content:
+                                new_content = msg.content[len(last_content):]
+                                if new_content:
+                                    last_content = msg.content
+                                    yield new_content
