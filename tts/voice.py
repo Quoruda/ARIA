@@ -167,3 +167,7 @@ class Voice:
         """Generates audio and calls self.add_to_queue(audio, sr)"""
         raise NotImplementedError
 
+    def get_tools(self) -> list:
+        """Optional method for voices that can provide TTS tools to the agent."""
+        return []
+

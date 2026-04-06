@@ -1,4 +1,5 @@
 from tts.voice import Voice
+from langchain_core.tools import tool
 from kokoro import KPipeline
 import numpy as np
 import torch
@@ -67,3 +68,25 @@ class KokoroVoice(Voice):
             packs.append(pack * normalized_weight)
             
         return torch.sum(torch.stack(packs), dim=0)
+
+    def get_tools(self) -> list:
+        @tool
+        def set_voice_parameters(calm: float, warm: float, dynamic: float, gender: float) -> str:
+            """Set the voice parameters for Kokoro TTS.
+
+            Args:
+                calm: Calmness level (-5 to +5)
+                warm: Warmth level (-5 to +5)
+                dynamic: Dynamism level (-5 to +5)
+                gender: Gender balance (-5 for fully female, +5 for fully male)
+            """
+
+            self.calm_raw = np.clip(calm, -5, 5)
+            self.warm_raw = np.clip(warm, -5, 5)
+            self.dynamic_raw = np.clip(dynamic, -5, 5)
+            self.gender_raw = np.clip(gender, -5, 5)
+
+            return f"Voice parameters updated: calm={calm}, warm={warm}, dynamic={dynamic}, gender={gender}"
+
+        return [set_voice_parameters]
+
