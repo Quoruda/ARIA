@@ -27,10 +27,12 @@ class WindowManager:
                 x11_path = util.find_library('X11')
                 if x11_path:
                     self.x11 = ctypes.CDLL(x11_path)
+                    self.x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
                     self.x11.XOpenDisplay.restype = ctypes.c_void_p
                     self.display = self.x11.XOpenDisplay(None)
                     if self.display:
-                        self.x11.XDefaultRootWindow.restype = ctypes.c_uint64
+                        self.x11.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
+                        self.x11.XDefaultRootWindow.restype = ctypes.c_ulong
                         self.root_win = self.x11.XDefaultRootWindow(self.display)
                         
                         # XShape Extension Setup
@@ -38,9 +40,12 @@ class WindowManager:
                         if xshape_path:
                             self.xshape = ctypes.CDLL(xshape_path)
                             self.xshape.XShapeCombineRectangles.argtypes = [
-                                ctypes.c_void_p, ctypes.c_uint64, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                ctypes.c_void_p, ctypes.c_ulong, ctypes.c_int, ctypes.c_int, ctypes.c_int,
                                 ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int
                             ]
+                        
+                        # Fix XFlush argtypes to avoid pointer truncation segfault
+                        self.x11.XFlush.argtypes = [ctypes.c_void_p]
             
             elif self.os_type == 'win32':
                 # Windows Setup
@@ -52,7 +57,14 @@ class WindowManager:
     def get_global_mouse_pos(self):
         """Returns (x, y) global screen coordinates."""
         if self.os_type.startswith('linux') and self.x11 and self.display:
-            root_ret, child_ret = ctypes.c_uint64(), ctypes.c_uint64()
+            self.x11.XQueryPointer.argtypes = [
+                ctypes.c_void_p, ctypes.c_ulong,
+                ctypes.POINTER(ctypes.c_ulong), ctypes.POINTER(ctypes.c_ulong),
+                ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
+                ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
+                ctypes.POINTER(ctypes.c_uint)
+            ]
+            root_ret, child_ret = ctypes.c_ulong(), ctypes.c_ulong()
             root_x, root_y = ctypes.c_int(), ctypes.c_int()
             win_x, win_y = ctypes.c_int(), ctypes.c_int()
             mask = ctypes.c_uint()
@@ -80,7 +92,9 @@ class WindowManager:
             self.window_handle = wm_info.get('window')
 
         if self.os_type.startswith('linux') and self.x11 and self.display and self.window_handle:
+            self.x11.XMoveWindow.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_int, ctypes.c_int]
             self.x11.XMoveWindow(self.display, self.window_handle, int(x), int(y))
+            self.x11.XFlush.argtypes = [ctypes.c_void_p]
             self.x11.XFlush(self.display)
         
         elif self.os_type == 'win32' and self.user32 and self.window_handle:
@@ -127,16 +141,17 @@ class WindowManager:
         if not rects:
             # Empty mask (make window invisible)
             # We must use at least one empty rect or use ShapeSet with no rects
-            self.xshape.XShapeCombineRectangles(self.display, self.window_handle, 0, 0, 0, None, 0, 0, 0)
+            self.xshape.XShapeCombineRectangles(self.display, ctypes.c_ulong(self.window_handle), 0, 0, 0, None, 0, 0, 0)
         else:
             rect_array = (rect_class * len(rects))(*rects)
             # ShapeBounding = 0, ShapeClip = 1
             # UNORDERED = 0, YSorted = 1, YXSorted = 2, YXBanded = 3
             # ShapeSet = 0, ShapeUnion = 1, ShapeIntersect = 2, ShapeSubtract = 3, ShapeInvert = 4
-            self.xshape.XShapeCombineRectangles(self.display, self.window_handle, 0, 0, 0, ctypes.byref(rect_array), len(rects), 0, 3)
-            
+            self.xshape.XShapeCombineRectangles(self.display, ctypes.c_ulong(self.window_handle), 0, 0, 0, ctypes.byref(rect_array), len(rects), 0, 3)
+
         self.x11.XFlush(self.display)
 
     def close(self):
         if self.os_type.startswith('linux') and self.x11 and self.display:
+            self.x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
             self.x11.XCloseDisplay(self.display)

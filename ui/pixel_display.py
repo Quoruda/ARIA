@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
+import os
+if os.name != 'nt':
+    os.environ['SDL_VIDEODRIVER'] = 'x11'
+    os.environ['SDL_AUDIODRIVER'] = 'dummy'
+
 import pygame
 import random
-import os
+import warnings
 from pygame import Surface
 from pygame.locals import (
     QUIT,
@@ -41,10 +46,6 @@ COLOR_TRANSPARENT = (255, 0, 255) # Magic Pink
 STATE_KEYS = {K_1: "idle", K_2: "working", K_3: "thinking", K_4: "speaking", K_5: "loading", K_6: "exploding"}
 
 def main():
-    if os.name != 'nt':
-        os.environ['SDL_VIDEODRIVER'] = 'x11'
-    os.environ['SDL_AUDIODRIVER'] = 'dummy'
-
     pygame.init()
     clock = pygame.time.Clock()
     
