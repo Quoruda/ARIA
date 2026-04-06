@@ -71,7 +71,7 @@ class KokoroVoice(Voice):
 
     def get_tools(self) -> list:
         @tool
-        def set_voice_parameters(calm: float, warm: float, dynamic: float, gender: float) -> str:
+        def set_kokoro_voice_parameters(calm: float, warm: float, dynamic: float, gender: float) -> str:
             """Set the voice parameters for Kokoro TTS.
 
             Args:
@@ -88,5 +88,7 @@ class KokoroVoice(Voice):
 
             return f"Voice parameters updated: calm={calm}, warm={warm}, dynamic={dynamic}, gender={gender}"
 
-        return [set_voice_parameters]
+        return [set_kokoro_voice_parameters]
 
+    def to_string(self) -> str:
+        return f"KokoroVoice(calm={self.calm_raw:.2f}, warm={self.warm_raw:.2f}, dynamic={self.dynamic_raw:.2f}, gender={self.gender_raw:.2f})"

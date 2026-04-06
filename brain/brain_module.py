@@ -54,10 +54,12 @@ class AgentBrain:
             )
             return [SystemMessage(content=content)] + trimmed
 
+        self._prompt_modifier = _prompt_modifier
+
         self._agent = create_react_agent(
             provider.get_model(),
             tools=self.tools,
-            prompt=_prompt_modifier,
+            prompt=self._prompt_modifier,
             checkpointer=self.checkpointer,
         )
 
@@ -123,3 +125,14 @@ class AgentBrain:
                                 if new_content:
                                     last_content = msg.content
                                     yield new_content
+
+    def add_tools(self, new_tools: list):
+        """Add tools dynamically to the agent."""
+        self.tools.extend(new_tools)
+        # Rebuild the agent with updated tools
+        self._agent = create_react_agent(
+            self.provider.get_model(),
+            tools=self.tools,
+            prompt=self._prompt_modifier,
+            checkpointer=self.checkpointer,
+        )

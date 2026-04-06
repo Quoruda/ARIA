@@ -68,6 +68,14 @@ class DefaultAgent(AgentBrain):
         if discovery_block:
             discovery_block = discovery_block.strip() + "\n\n"
 
+        supplementary_info_block = ""
+        if len(self.supplementary_info.keys()) > 0:
+            supplementary_info_block = (
+                "SUPPLEMENTARY INFO:\n"
+                + "\n".join([f"{k}: {v}" for k, v in self.supplementary_info.items()])
+                + "\n\n"
+            )
+
         return (
             "You are ARIA (Advanced Responsive Intelligent Assistant), a friendly and capable AI assistant designed for natural, spoken-word conversation.\n"
             f"Current time: {current_time}\n"
@@ -94,7 +102,7 @@ class DefaultAgent(AgentBrain):
         scratchpad_path: str | None = None,
     ):
         self.target_language = target_language
-
+        self.supplementary_info = {}
         self.scratchpad = ScratchpadManager(filepath=scratchpad_path)
         scratchpad_tools = list(build_scratchpad_tools(self.scratchpad))
 

@@ -171,3 +171,7 @@ class Voice:
         """Optional method for voices that can provide TTS tools to the agent."""
         return []
 
+    def to_string(self) -> str:
+        """Returns a string representation of the voice (e.g., for logging)."""
+        raise NotImplementedError
+

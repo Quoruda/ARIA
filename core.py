@@ -32,6 +32,8 @@ class CoreManager:
 
         # 2. Voice (TTS) — Loaded only if output is audio
         self.voice = Voice.from_env() if self.output_mode == "audio" else None
+        if self.voice:
+            self.brain.add_tools(self.voice.get_tools())
 
         # 3. Output
         self.output = OutputManager.from_env(
@@ -71,6 +73,8 @@ class CoreManager:
     def handle_user_prompt(self, text: str):
         """Handle user input from STT or terminal."""
         print(f"\n💬 You: {text}")
+        if self.voice:
+            self.brain.supplementary_info["Your Voice Settings"] = self.voice.to_string()
         self.output.stream_async(lambda: self.brain.stream(text))
 
     def handle_trigger_prompt(self, text: str):
