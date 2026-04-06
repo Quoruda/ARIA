@@ -8,7 +8,7 @@ load_dotenv()
 from triggers.engine import TriggerEngine
 from agents.default_agent import DefaultAgent
 from agents.trigger_agent import TriggerAgent
-from tts.tts import Voice
+from tts.voice import Voice
 from input import InputManager
 from output import OutputManager
 
