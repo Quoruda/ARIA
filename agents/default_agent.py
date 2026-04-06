@@ -104,6 +104,11 @@ class DefaultAgent(AgentBrain):
         self.target_language = target_language
         self.supplementary_info = {}
         self.scratchpad = ScratchpadManager(filepath=scratchpad_path)
+
+        for k in ["Name", "Location", "Job"]:
+            if k not in self.scratchpad.notes:
+                self.scratchpad.notes[k] = "Unknown"
+
         scratchpad_tools = list(build_scratchpad_tools(self.scratchpad))
 
         super().__init__(
