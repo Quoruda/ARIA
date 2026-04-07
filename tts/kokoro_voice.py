@@ -47,6 +47,23 @@ class KokoroVoice(Voice):
             # Kokoro always outputs 24000 Hz.
             self.add_to_queue(audio_chunk, 24000)
 
+    def generate_audio_file(self, text: str, output_path: str):
+        """Generate audio with Kokoro and save it directly to a file."""
+        import soundfile as sf
+        if self.pipeline is None:
+            self.load_model()
+
+        voice_pack = self.get_voice_pack()
+        generator = self.pipeline(text, voice=voice_pack, speed=self.speed)
+
+        chunks = []
+        for _, _, audio_chunk in generator:
+            chunks.append(audio_chunk)
+
+        if chunks:
+            final_audio = np.concatenate(chunks)
+            sf.write(output_path, final_audio, 24000)
+
     def get_voice_pack(self):
         weights = np.exp([self.calm_raw, self.warm_raw, self.dynamic_raw])
         weights /= weights.sum()  # softmax

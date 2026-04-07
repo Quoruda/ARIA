@@ -167,6 +167,10 @@ class Voice:
         """Generates audio and calls self.add_to_queue(audio, sr)"""
         raise NotImplementedError
 
+    def generate_audio_file(self, text: str, output_path: str):
+        """Generates audio and saves it to a file."""
+        raise NotImplementedError
+
     def get_tools(self) -> list:
         """Optional method for voices that can provide TTS tools to the agent."""
         return []
