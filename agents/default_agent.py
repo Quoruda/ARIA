@@ -111,9 +111,12 @@ class DefaultAgent(AgentBrain):
 
         scratchpad_tools = list(build_scratchpad_tools(self.scratchpad))
 
+        raw_tools = [schedule_action, get_search_tool(), get_weather_forecast, *scratchpad_tools]
+        active_tools = [t for t in raw_tools if t is not None]
+
         super().__init__(
             provider=provider,
-            tools=[schedule_action, get_search_tool(), get_weather_forecast, *scratchpad_tools],
+            tools=active_tools,
             checkpointer=get_context_checkpointer(),
             thread_id="main",
             max_messages=max_messages,
