@@ -181,7 +181,7 @@ Current tools (see `tools/`):
 - Time context:
   - `get_temporal_context()`
 - Web search:
-  - Tavily search tool (requires `TAVILY_API_KEY`) in `tools/search_tool.py`
+  - Tavily search tool in `tools/search_tool.py` (requires `TAVILY_API_KEY`, automatically disabled if missing)
 - Weather:
   - Open-Meteo (no API key) via `get_weather_forecast(city, date_str="", country_code="")`
 - Scratchpad memory:
