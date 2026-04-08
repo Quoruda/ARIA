@@ -5,8 +5,10 @@ Welcome to the **ARIA** project (*AI Interface with a pixel-art face*). This doc
 ## 🌟 Overview
 ARIA is a local-first AI interface featuring an animated pixel-art face. It combines:
 - A LangGraph ReAct agent backed by **Ollama**, **Mistral**, or **Kobold**
+- A **multi-channel I/O bus** (local audio, terminal, Telegram) via `asyncio`
 - Optional **speech recognition** (push-to-talk STT)
 - Optional **streaming speech synthesis** (TTS)
+- Optional **Telegram bot** integration (text & voice messages)
 - A lightweight **scheduled trigger engine** (reminders / delayed actions)
 - Optional **scratchpad memory** (simple JSON user profile notes)
 
@@ -41,7 +43,7 @@ Audio stack components used by channels:
 - STT: `stt/micro_recorder.py` and `stt/whisper_faster.py`
 - TTS: `tts/voice.py` and `tts/kokoro_voice.py`
 
-### 4. Brain (LLM) (`brain/`, `agents/`)
+### 3. Brain (LLM) (`brain/`, `agents/`)
 The agent framework is implemented with LangGraph:
 - `brain/brain_module.py`: `AgentBrain` base class (LangGraph ReAct agent)
 
@@ -62,7 +64,7 @@ Two concrete agents live in `agents/`:
   - No conversation memory
   - Tools: temporal context + trigger scheduling
 
-### 5. Memory & Persistence (`memory/`)
+### 4. Memory & Persistence (`memory/`)
 ARIA has two distinct memory layers:
 
 1) Conversation state (LangGraph checkpointer):
@@ -79,7 +81,7 @@ Implementation:
 - `memory/scratchpad.py` stores stable facts like Name/Location/Preferences.
 - Enabled by setting `SCRATCHPAD_PATH` to a JSON file path.
 
-### 6. Triggers (Scheduler) (`triggers/`, `tools/`)
+### 5. Triggers (Scheduler) (`triggers/`, `tools/`)
 The trigger system is decoupled from the UI and the LLM:
 - `triggers/base_trigger.py`: base trigger type (with claim/execution locking)
 - `triggers/time_trigger.py`: executes when a scheduled time window is reached
@@ -93,7 +95,7 @@ Tools exposed to the LLM:
 Note:
 - Trigger-related tools live under `triggers/` (domain ownership). The `tools/` folder contains unrelated tools (search, weather, time context).
 
-### 7. UI (Pixel Face) (`ui/`)
+### 6. UI (Pixel Face) (`ui/`)
 This repo also includes a Pygame pixel-art face UI:
 - `ui/pixel_display.py`: window + event loop
 - `ui/pixel_renderer.py`: animations and rendering
@@ -104,11 +106,15 @@ Note: the UI can be run independently from the assistant core.
 ## ⚙️ Configuration
 ARIA uses `python-dotenv` in `core.py`.
 
-- Use `.env.example` as the reference.
-- Create a local `.env` at repo root.
+- **Recommended:** Run the interactive setup wizard to generate your `.env`:
+  ```bash
+  python setup.py
+  ```
+- Or manually copy `.env.example` to `.env` and fill in your values.
 
 Key variables (non-exhaustive):
 - Modes: `INPUT_MODE` (`text|audio`), `OUTPUT_MODE` (`text|audio`)
+- Telegram: `TELEGRAM_BOT_TOKEN` (optional, enables the Telegram channel)
 - Provider: `AI_SOURCE` (`ollama|mistral|kobold`)
 - Model: `AI_MODEL_ID`
 - Provider-specific:
@@ -126,8 +132,7 @@ Before publishing this repository on GitHub:
 - **Never commit secrets**: API keys, tokens, private endpoints.
   - Keep `.env` ignored and only commit `.env.example`.
   - Rotate any key that has been committed or shared.
-- If you enable Tavily search, keep `TAVILY_API_KEY` out of the repo.
-- If you use Mistral, keep `MISTRAL_API_KEY` out of the repo.
+- Secrets to watch: `MISTRAL_API_KEY`, `TAVILY_API_KEY`, `HF_TOKEN`, `TELEGRAM_BOT_TOKEN`.
 
 ## 🚀 Installation
 ```bash
@@ -148,15 +153,14 @@ python core.py
 INPUT_MODE=text OUTPUT_MODE=text python core.py
 ```
 
-### 3) Mixed modes
-Text input but audio output:
-```bash
-INPUT_MODE=text OUTPUT_MODE=audio python core.py
-```
-
-### 4) UI only
+### 3) UI only
 ```bash
 python ui/pixel_display.py
+```
+
+### 4) Interactive setup wizard
+```bash
+python setup.py
 ```
 
 ## 🧰 Tools available to the LLM
@@ -192,7 +196,7 @@ Current tools (see `tools/`):
 - Link `core.py` runtime states to Pygame face animations (Idle, Listening, Thinking, Speaking).
 - Add non-time triggers (event-based triggers).
 - Make trigger storage persistent (optional).
-- Create an interactive install/setup script (`setup_aria.py`) to generate and validate `.env`.
+- ~~Create an interactive install/setup script to generate and validate `.env`.~~ ✅ Done (`setup.py`)
 - Implement a "Visual Cortex" tool (screenshot capture + analysis via a sub-agent to protect VRAM).
 - Add basic system control tools (launch local apps and simple browser control).
 - Expand the action/tooling layer (system automation) with safe permissions.
