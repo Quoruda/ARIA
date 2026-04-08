@@ -31,3 +31,7 @@ pynput
 python-telegram-bot
 soundfile
 python-dotenv
+
+# Setup wizard
+questionary
+rich
