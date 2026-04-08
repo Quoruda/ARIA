@@ -18,33 +18,28 @@ ARIA is a local-first AI interface featuring an animated pixel-art face. It comb
 ## 🏗️ Project Architecture
 
 ### 1. Core Orchestrator (`core.py`)
-`core.py` wires everything together:
+`core.py` is an `asyncio` event-driven Orchestrator that wires everything together:
 - Loads `.env` via `python-dotenv`
-- Selects **input** mode (text or audio) and **output** mode (text or audio)
+- Instantiates the active **Channels** (Local Audio/Terminal, Telegram) based on env vars
 - Instantiates 2 agents:
   - `DefaultAgent` for user conversations
   - `TriggerAgent` for scheduled trigger execution
+- Acts as a **Message Router**, asynchronously forwarding `MessageContext` events from channels to the LLM, and streaming the generated replies back to the origin channel.
 - Starts the `TriggerEngine` in the background
 
-Key principle: **Core routes work, it doesn’t decide behavior.**
+Key principle: **Core routes work as a message bus, it doesn’t decide behavior.**
 
-### 2. Input (`input.py`, `stt/`)
-- `InputManager` supports two modes:
-  - `INPUT_MODE=text`: read from the terminal
-  - `INPUT_MODE=audio`: push-to-talk microphone recording
-- `stt/micro_recorder.py` implements the push-to-talk recorder.
-- `stt/whisper_faster.py` provides Faster-Whisper transcription.
+### 2. Channels (I/O) (`channels/`)
+The system follows an asynchronous Message Bus architecture. Instead of hardcoded inputs and outputs, ARIA uses "Channels" that implement `BaseChannel` and exchange `MessageContext` objects.
 
-Note: audio mode depends on system audio access (PortAudio via `sounddevice`).
+Active channels are automatically loaded by `core.py`:
+- `LocalTerminalChannel`: Standard text input/output for debug and testing.
+- `LocalAudioChannel`: Employs `PushToTalkRecorder` + Faster-Whisper for STT, and KokoroTTS for audio generation.
+- `TelegramChannel`: Uses `python-telegram-bot` to expose ARIA via a Telegram bot, seamlessly supporting both text and voice messages.
 
-### 3. Output (`output.py`, `tts/`)
-- `OutputManager` consumes the LLM token stream.
-- In `OUTPUT_MODE=audio`, it buffers sentences and sends them to TTS.
-- In `OUTPUT_MODE=text`, it only prints to stdout.
-
-TTS stack:
-- `tts/tts.py` / `tts/voice.py`: queue + playback thread
-- `tts/kokoro_voice.py`: Kokoro-ONNX voice backend
+Audio stack components used by channels:
+- STT: `stt/micro_recorder.py` and `stt/whisper_faster.py`
+- TTS: `tts/voice.py` and `tts/kokoro_voice.py`
 
 ### 4. Brain (LLM) (`brain/`, `agents/`)
 The agent framework is implemented with LangGraph:
