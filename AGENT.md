@@ -186,11 +186,70 @@ Current tools (see `tools/`):
 - Scratchpad memory:
   - `set_memory(key, value)` persists stable user info when `SCRATCHPAD_PATH` is set
 
-## 🧪 Development notes
-- Prefer small, composable modules.
-- Keep assistant personality in `agents/default_agent.py` and `agents/trigger_agent.py`.
-- Keep orchestration in `core.py`.
+## 🧪 Development Guidelines
+
+### Language & Style
+- **All code, comments, docstrings, variable names, and class names must be in English.** No exceptions.
+- All user-facing strings (terminal logs, Telegram system messages, setup wizard) must also be in English.
+- System messages sent to end-users via Telegram must be prefixed with `🔧 System:` to distinguish them from LLM-generated responses.
+
+### Core Philosophy: Modularity
+ARIA is designed to be **modular above all else**. Every component (agent, channel, tool, provider) must be swappable, removable, or replaceable without affecting the rest of the system. Before writing any code, ask yourself:
+- Can this feature be disabled via `.env` without breaking anything?
+- Can someone add a similar feature without modifying existing files?
+- Does this introduce a hard dependency between two modules that were previously independent?
+
+If the answer to any of these is wrong, rethink the design. The goal is a system where you can plug in a new LLM provider, a new communication channel, or a new tool in minutes — not hours.
+
+### Architecture Principles
+- **Separation of concerns is strict.** Each folder owns its domain:
+  - `brain/` → LLM providers and the generic `AgentBrain` base class. Must not import `memory/`, `channels/`, or `tools/`.
+  - `agents/` → Concrete agent subclasses (personality, system prompt, tool selection). Each agent uses `AgentBrain` via inheritance and can import from `memory/`, `tools/`, and `triggers/`.
+  - `channels/` → I/O adapters (terminal, audio, Telegram). Channels never call the LLM directly; they emit `MessageContext` objects to the orchestrator.
+  - `tools/` → Standalone LLM-callable tools (search, weather, time). A tool must not import from `brain/` or `channels/`.
+  - `triggers/` → Trigger domain (scheduler, engine, trigger types, trigger-related tools). Trigger tools live here, not in `tools/`.
+  - `core.py` → The async orchestrator. It routes messages and wires components. It must not contain business logic.
+
+### Adding a New Agent
+1. Create a new file in `agents/` (e.g., `agents/my_agent.py`).
+2. Subclass `AgentBrain` from `brain/brain_module.py`.
+3. Override `get_system_prompt()` to define the agent's personality and instructions.
+4. Select tools in `__init__()` and pass them to `super().__init__()`.
+5. Implement a `from_env()` classmethod that reads configuration from `.env` and returns a ready instance.
+6. Use `AgentBrain.build_provider(source, temperature)` to instantiate the LLM provider.
+
+### Adding a New Channel
+1. Create a new file in `channels/` (e.g., `channels/discord_channel.py`).
+2. Subclass `BaseChannel` from `channels/base.py`.
+3. Implement `start()`, `stop()`, and `send_async(message: MessageContext)`.
+4. When user input is received, build a `MessageContext` and call `await self.on_message_received(msg)`.
+5. Register the channel in `core.py` → `CoreOrchestrator.__init__()` using `self.register_channel(...)`.
+6. The `send_async()` method must handle both `async generators` and plain strings in `message.content`.
+
+### Adding a New Tool
+1. Create a new file in `tools/` (or `triggers/` if trigger-related).
+2. Use the `@tool` decorator from `langchain_core.tools`.
+3. The tool function must return a `str` (the result the LLM will see).
+4. Include a detailed docstring with `Args:`, `Returns:`, and `Failure modes:` so the LLM knows when and how to use it.
+5. Wire the tool into the appropriate agent's `__init__()` in `agents/`.
+
+### Adding a New LLM Provider
+1. Create a new file in `brain/` (e.g., `brain/openrouter_provider.py`).
+2. Subclass `ModelProvider` from `brain/model_provider.py` and implement `get_model()`.
+3. Register it in `AgentBrain.build_provider()` inside `brain/brain_module.py`.
+4. Add the corresponding env vars to `.env.example` and to `setup.py`.
+
+### Configuration & Environment
+- All runtime configuration goes through `.env` (loaded by `python-dotenv`).
+- Every new env var must be added to **both** `.env.example` (with a comment) and `setup.py` (interactive wizard).
+- Use `os.getenv("KEY", "default")` with sensible defaults so ARIA can start with minimal configuration.
+
+### General Rules
+- Prefer small, composable modules over large monolithic files.
+- Keep orchestration in `core.py` — it wires components, it doesn't decide behavior.
 - Keep business logic out of tools: tools should delegate to modules and return structured results.
+- `core.py` runs on `asyncio`. Any blocking call (LLM inference, audio generation, STT) must be wrapped with `asyncio.to_thread()`.
+- When consuming LLM output in a channel, always check for `__aiter__` (async generator) first, then `__iter__`, then plain `str`.
 
 ## 🗺️ Roadmap (high-level)
 - Link `core.py` runtime states to Pygame face animations (Idle, Listening, Thinking, Speaking).
