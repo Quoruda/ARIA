@@ -154,8 +154,12 @@ class Voice(ABC):
             stream.close()
 
     def add_to_queue(self, audio_data, sample_rate: int):
-        """Method to be called by child classes to play sound."""
-        self.audio_queue.put((audio_data, sample_rate))
+        """Play audio immediately using sounddevice instead of queuing."""
+        try:
+            sd.play(audio_data, samplerate=sample_rate)
+            sd.wait()
+        except Exception as e:
+            print(f"[TTS] Playback error: {e}")
 
     # --- ABSTRACT METHODS (must be implemented by subclasses) ---
     @abstractmethod
