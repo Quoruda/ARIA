@@ -4,7 +4,7 @@ from datetime import datetime
 from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.prebuilt import ToolNode, tools_condition
 
-from brain.brain_module import AgentBase
+from brain.agent_base import AgentBase
 from memory.context_provider import get_context_checkpointer
 from memory.scratchpad import ScratchpadManager, build_scratchpad_tools
 from tools.search_tool import get_search_tool

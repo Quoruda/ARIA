@@ -3,7 +3,7 @@ from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.prebuilt import ToolNode, tools_condition
 from tools.time_tool import get_temporal_context
 from triggers.trigger_tool import schedule_action
-from brain.brain_module import AgentBase
+from brain.agent_base import AgentBase
 
 
 class TriggerAgent(AgentBase):
