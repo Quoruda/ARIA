@@ -204,7 +204,7 @@ ARIA is designed to be **modular above all else**. Every component (agent, chann
 If the answer to any of these is wrong, rethink the design. The goal is a system where you can plug in a new LLM provider, a new communication channel, or a new tool in minutes — not hours.
 
 **2. Don't Reinvent the Wheel**
-Whenever possible, leverage existing, established libraries instead of writing custom complex implementations from scratch. Use the right tools for the job: we use *LangGraph* for agent orchestration, *python-telegram-bot* for Telegram integration, and *python-dotenv* for configuration. Write your own code to elegantly wire these systems together, but rely on mature, community-backed dependencies for the heavy lifting.
+Whenever possible, leverage existing, established libraries instead of writing custom complex implementations from scratch. Use the right tools for the job: we use *LangGraph* for agent orchestration, *python-telegram-bot* for Telegram integration, *sounddevice* for direct audio playback, *tenacity* for robust retry logic, and *python-dotenv* for configuration. Write your own code to elegantly wire these systems together, but rely on mature, community-backed dependencies for the heavy lifting.
 
 ### Architecture Principles
 - **Separation of concerns is strict.** Each folder owns its domain:
@@ -256,6 +256,7 @@ Whenever possible, leverage existing, established libraries instead of writing c
 - Keep business logic out of tools: tools should delegate to modules and return structured results.
 - `core.py` runs on `asyncio`. Any blocking call (LLM inference, audio generation, STT) must be wrapped with `asyncio.to_thread()`.
 - When consuming LLM output in a channel, always check for `__aiter__` (async generator) first, then `__iter__`, then plain `str`.
+- Use the `abc` module (`ABC`, `@abstractmethod`) to define abstract base classes and interfaces. This ensures subclasses properly implement required methods at instantiation time, preventing unexpected `NotImplementedError` crashes at runtime.
 
 ## 🗺️ Roadmap (high-level)
 - Link `core.py` runtime states to Pygame face animations (Idle, Listening, Thinking, Speaking).
