@@ -1,8 +1,9 @@
 import asyncio
+from abc import ABC, abstractmethod
 from typing import Callable, Awaitable, Optional
 from .message import MessageContext
 
-class BaseChannel:
+class BaseChannel(ABC):
     """Base interface for all input/output channels in the ARIA system."""
     
     def __init__(self, name: str):
@@ -22,6 +23,7 @@ class BaseChannel:
         """Stops the channel and cleans up resources."""
         pass
 
+    @abstractmethod
     async def send_async(self, message: MessageContext):
         """Dispatches an outgoing message to the user via this channel."""
-        raise NotImplementedError("Each channel must implement send_async()")
+        ...

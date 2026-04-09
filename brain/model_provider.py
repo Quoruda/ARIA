@@ -1,4 +1,7 @@
-class ModelProvider:
+from abc import ABC, abstractmethod
+
+class ModelProvider(ABC):
+    @abstractmethod
     def get_model(self):
-        """Returns a configured phi.model.Model instance."""
-        raise NotImplementedError
+        """Returns a configured LangChain-compatible model instance."""
+        ...

@@ -2,8 +2,9 @@ import threading
 import queue
 import sounddevice as sd
 import os
+from abc import ABC, abstractmethod
 
-class Voice:
+class Voice(ABC):
     @classmethod
     def from_env(cls) -> "Voice":
         """Factory method to create the correct voice instance based on ENV."""
@@ -156,26 +157,33 @@ class Voice:
         """Method to be called by child classes to play sound."""
         self.audio_queue.put((audio_data, sample_rate))
 
-    # --- ABSTRACT METHODS (To be implemented by children) ---
+    # --- ABSTRACT METHODS (must be implemented by subclasses) ---
+    @abstractmethod
     def load_model(self):
-        raise NotImplementedError
+        """Loads the underlying TTS model into memory."""
+        ...
 
+    @abstractmethod
     def unload_model(self):
-        raise NotImplementedError
+        """Releases the TTS model from memory."""
+        ...
 
+    @abstractmethod
     def generate_audio(self, text: str):
-        """Generates audio and calls self.add_to_queue(audio, sr)"""
-        raise NotImplementedError
+        """Generates audio chunks and enqueues them via self.add_to_queue(audio, sr)."""
+        ...
 
+    @abstractmethod
     def generate_audio_file(self, text: str, output_path: str):
-        """Generates audio and saves it to a file."""
-        raise NotImplementedError
+        """Generates audio and saves it to a file at output_path."""
+        ...
+
+    @abstractmethod
+    def to_string(self) -> str:
+        """Returns a human-readable string describing the current voice configuration."""
+        ...
 
     def get_tools(self) -> list:
-        """Optional method for voices that can provide TTS tools to the agent."""
+        """Optional: returns LangChain tools this voice exposes to the agent. Override if needed."""
         return []
-
-    def to_string(self) -> str:
-        """Returns a string representation of the voice (e.g., for logging)."""
-        raise NotImplementedError
 
