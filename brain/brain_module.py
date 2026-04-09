@@ -1,4 +1,4 @@
-from langgraph.prebuilt import create_react_agent
+from abc import ABC, abstractmethod
 from langchain_core.messages import trim_messages, SystemMessage
 
 from .ollama_provider import OllamaProvider
@@ -6,9 +6,9 @@ from .mistral_provider import MistralProvider
 from .kobold_provider import KoboldProvider
 
 
-class AgentBrain:
+class AgentBrain(ABC):
     """
-    Generic base class for a LangGraph react agent.
+    Generic base class for a LangGraph agent.
 
     Subclasses define their own system prompt, tools, and memory settings
     by calling super().__init__() with the appropriate arguments.
@@ -20,6 +20,14 @@ class AgentBrain:
         Subclasses should override this to provide dynamic content based on history.
         """
         return self.system_prompt
+
+    @abstractmethod
+    def _build_agent(self):
+        """
+        Build and return the LangGraph agent for this brain.
+        Subclasses must implement this to define their own execution graph.
+        """
+        pass
 
     def __init__(
         self,
@@ -56,12 +64,7 @@ class AgentBrain:
 
         self._prompt_modifier = _prompt_modifier
 
-        self._agent = create_react_agent(
-            provider.get_model(),
-            tools=self.tools,
-            prompt=self._prompt_modifier,
-            checkpointer=self.checkpointer,
-        )
+        self._agent = self._build_agent()
 
     # ------------------------------------------------------------------ #
     # Shared helpers                                                       #
@@ -130,9 +133,4 @@ class AgentBrain:
         """Add tools dynamically to the agent."""
         self.tools.extend(new_tools)
         # Rebuild the agent with updated tools
-        self._agent = create_react_agent(
-            self.provider.get_model(),
-            tools=self.tools,
-            prompt=self._prompt_modifier,
-            checkpointer=self.checkpointer,
-        )
+        self._agent = self._build_agent()

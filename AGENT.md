@@ -45,7 +45,7 @@ Audio stack components used by channels:
 
 ### 3. Brain (LLM) (`brain/`, `agents/`)
 The agent framework is implemented with LangGraph:
-- `brain/brain_module.py`: `AgentBrain` base class (LangGraph ReAct agent)
+- `brain/brain_module.py`: `AgentBrain` abstract base class
 
 Design note:
 - `brain/` does not import `memory/`. Persistence is configured at the agent/orchestration layer by injecting a LangGraph checkpointer (see `memory/context_provider.py`).
@@ -214,9 +214,10 @@ If the answer to any of these is wrong, rethink the design. The goal is a system
 1. Create a new file in `agents/` (e.g., `agents/my_agent.py`).
 2. Subclass `AgentBrain` from `brain/brain_module.py`.
 3. Override `get_system_prompt()` to define the agent's personality and instructions.
-4. Select tools in `__init__()` and pass them to `super().__init__()`.
-5. Implement a `from_env()` classmethod that reads configuration from `.env` and returns a ready instance.
-6. Use `AgentBrain.build_provider(source, temperature)` to instantiate the LLM provider.
+4. Override `_build_agent()` to manually construct and compile your LangGraph `StateGraph` for the agent.
+5. Select tools in `__init__()` and pass them to `super().__init__()`.
+6. Implement a `from_env()` classmethod that reads configuration from `.env` and returns a ready instance.
+7. Use `AgentBrain.build_provider(source, temperature)` to instantiate the LLM provider.
 
 ### Adding a New Channel
 1. Create a new file in `channels/` (e.g., `channels/discord_channel.py`).

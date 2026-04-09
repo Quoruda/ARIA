@@ -1,6 +1,9 @@
 import os
 from datetime import datetime
 
+from langgraph.graph import StateGraph, START, END, MessagesState
+from langgraph.prebuilt import ToolNode, tools_condition
+
 from brain.brain_module import AgentBrain
 from memory.context_provider import get_context_checkpointer
 from memory.scratchpad import ScratchpadManager, build_scratchpad_tools
@@ -13,6 +16,35 @@ class DefaultAgent(AgentBrain):
     """
     The main conversational assistant agent.
     """
+
+    def _build_agent(self):
+        workflow = StateGraph(MessagesState)
+
+        model = self.provider.get_model()
+        if self.tools:
+            model_with_tools = model.bind_tools(self.tools)
+        else:
+            model_with_tools = model
+
+        def call_model(state: MessagesState):
+            messages = self._prompt_modifier(state)
+            response = model_with_tools.invoke(messages)
+            return {"messages": [response]}
+
+        workflow.add_node("agent", call_model)
+
+        if self.tools:
+            tool_node = ToolNode(self.tools)
+            workflow.add_node("tools", tool_node)
+
+            workflow.add_edge(START, "agent")
+            workflow.add_conditional_edges("agent", tools_condition)
+            workflow.add_edge("tools", "agent")
+        else:
+            workflow.add_edge(START, "agent")
+            workflow.add_edge("agent", END)
+
+        return workflow.compile(checkpointer=self.checkpointer)
 
     def get_system_prompt(self, messages: list = None) -> str:
         current_time = datetime.now().strftime("%A %d %B %Y %H:%M")

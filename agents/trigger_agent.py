@@ -1,4 +1,6 @@
 import os
+from langgraph.graph import StateGraph, START, END, MessagesState
+from langgraph.prebuilt import ToolNode, tools_condition
 from tools.time_tool import get_temporal_context
 from triggers.trigger_tool import schedule_action
 from brain.brain_module import AgentBrain
@@ -8,6 +10,35 @@ class TriggerAgent(AgentBrain):
     """
     A stateless, single-shot agent for executing scheduled triggers.
     """
+
+    def _build_agent(self):
+        workflow = StateGraph(MessagesState)
+
+        model = self.provider.get_model()
+        if self.tools:
+            model_with_tools = model.bind_tools(self.tools)
+        else:
+            model_with_tools = model
+
+        def call_model(state: MessagesState):
+            messages = self._prompt_modifier(state)
+            response = model_with_tools.invoke(messages)
+            return {"messages": [response]}
+
+        workflow.add_node("agent", call_model)
+
+        if self.tools:
+            tool_node = ToolNode(self.tools)
+            workflow.add_node("tools", tool_node)
+
+            workflow.add_edge(START, "agent")
+            workflow.add_conditional_edges("agent", tools_condition)
+            workflow.add_edge("tools", "agent")
+        else:
+            workflow.add_edge(START, "agent")
+            workflow.add_edge("agent", END)
+
+        return workflow.compile(checkpointer=self.checkpointer)
 
     def get_system_prompt(self) -> str:
         return (
