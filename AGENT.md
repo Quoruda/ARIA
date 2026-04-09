@@ -193,13 +193,18 @@ Current tools (see `tools/`):
 - All user-facing strings (terminal logs, Telegram system messages, setup wizard) must also be in English.
 - System messages sent to end-users via Telegram must be prefixed with `🔧 System:` to distinguish them from LLM-generated responses.
 
-### Core Philosophy: Modularity
+### Core Philosophy
+
+**1. Modularity Above All**
 ARIA is designed to be **modular above all else**. Every component (agent, channel, tool, provider) must be swappable, removable, or replaceable without affecting the rest of the system. Before writing any code, ask yourself:
 - Can this feature be disabled via `.env` without breaking anything?
 - Can someone add a similar feature without modifying existing files?
 - Does this introduce a hard dependency between two modules that were previously independent?
 
 If the answer to any of these is wrong, rethink the design. The goal is a system where you can plug in a new LLM provider, a new communication channel, or a new tool in minutes — not hours.
+
+**2. Don't Reinvent the Wheel**
+Whenever possible, leverage existing, established libraries instead of writing custom complex implementations from scratch. Use the right tools for the job: we use *LangGraph* for agent orchestration, *python-telegram-bot* for Telegram integration, and *python-dotenv* for configuration. Write your own code to elegantly wire these systems together, but rely on mature, community-backed dependencies for the heavy lifting.
 
 ### Architecture Principles
 - **Separation of concerns is strict.** Each folder owns its domain:
