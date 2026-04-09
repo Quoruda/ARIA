@@ -35,3 +35,4 @@ python-dotenv
 # Setup wizard
 questionary
 rich
+tenacity>=8.0.0

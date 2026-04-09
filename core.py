@@ -75,29 +75,26 @@ class CoreOrchestrator:
         try:
             # Helper to wrap the synchronous Agent stream into an async generator
             async def async_generator(user_input):
-                 max_retries = 3
-                 for attempt in range(max_retries):
-                     try:
-                         gen = self.brain.stream(user_input)
-                         _sentinel = object()
-                         success = False
-                         while True:
-                             chunk = await asyncio.to_thread(next, gen, _sentinel)
-                             if chunk is _sentinel:
-                                 break
-                             success = True
-                             yield chunk
-                             
-                         # If we exit the loop cleanly AND we got at least one chunk or finished cleanly, break the retry loop
-                         break
-                     except Exception as e:
-                         print(f"⚠️ Erreur de génération (Tentative {attempt+1}/{max_retries}): {e}")
-                         if attempt < max_retries - 1:
-                             print(f"⏳ Attente de 5 secondes avant de relancer...")
-                             await asyncio.sleep(5)
-                         else:
-                             yield "Désolé, je rencontre des difficultés techniques avec mes serveurs en ce moment. Veuillez réessayer plus tard."
-                             break
+                 from tenacity import AsyncRetrying, stop_after_attempt, wait_fixed, retry_if_exception_type
+                 _sentinel = object()
+                 async for attempt in AsyncRetrying(
+                     stop=stop_after_attempt(3),
+                     wait=wait_fixed(5),
+                     retry=retry_if_exception_type(Exception),
+                     reraise=False,
+                 ):
+                     with attempt:
+                         try:
+                             gen = self.brain.stream(user_input)
+                             while True:
+                                 chunk = await asyncio.to_thread(next, gen, _sentinel)
+                                 if chunk is _sentinel:
+                                     break
+                                 yield chunk
+                         except Exception as e:
+                             if attempt.retry_state.attempt_number == 3:
+                                 yield "Sorry, I'm experiencing technical difficulties. Please try again later."
+                             raise
 
             # Send back the reply on the target channel
             reply_msg = MessageContext(
@@ -127,24 +124,27 @@ class CoreOrchestrator:
         self._is_generating = True
         try:
             async def async_generator(user_input):
-                 max_retries = 3
-                 for attempt in range(max_retries):
-                     try:
-                         gen = self.trigger_brain.stream(user_input)
-                         _sentinel = object()
-                         while True:
-                             chunk = await asyncio.to_thread(next, gen, _sentinel)
-                             if chunk is _sentinel:
-                                 break
-                             yield chunk
-                         break
-                     except Exception as e:
-                         print(f"⚠️ Erreur de trigger (Tentative {attempt+1}/{max_retries}): {e}")
-                         if attempt < max_retries - 1:
-                             await asyncio.sleep(5)
-                         else:
-                             break
-                         
+                from tenacity import AsyncRetrying, stop_after_attempt, wait_fixed, retry_if_exception_type
+                _sentinel = object()
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_fixed(5),
+                    retry=retry_if_exception_type(Exception),
+                    reraise=False,
+                ):
+                    with attempt:
+                        try:
+                            gen = self.trigger_brain.stream(user_input)
+                            while True:
+                                chunk = await asyncio.to_thread(next, gen, _sentinel)
+                                if chunk is _sentinel:
+                                    break
+                                yield chunk
+                        except Exception as e:
+                            if attempt.retry_state.attempt_number == 3:
+                                # final failure, silently stop (no user‑visible chunk needed)
+                                pass
+                            raise
             # Send triggers to the active primary channel (e.g. local_audio)
             target = "local_audio" if "local_audio" in self.channels else "local_terminal"
             
