@@ -6,7 +6,7 @@ from .mistral_provider import MistralProvider
 from .kobold_provider import KoboldProvider
 
 
-class AgentBrain(ABC):
+class AgentBase(ABC):
     """
     Generic base class for a LangGraph agent.
 

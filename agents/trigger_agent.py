@@ -3,10 +3,10 @@ from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.prebuilt import ToolNode, tools_condition
 from tools.time_tool import get_temporal_context
 from triggers.trigger_tool import schedule_action
-from brain.brain_module import AgentBrain
+from brain.brain_module import AgentBase
 
 
-class TriggerAgent(AgentBrain):
+class TriggerAgent(AgentBase):
     """
     A stateless, single-shot agent for executing scheduled triggers.
     """
@@ -72,6 +72,6 @@ class TriggerAgent(AgentBrain):
         temperature = float(os.getenv("TEMPERATURE", "0.4"))
         target_language = os.getenv("TARGET_LANGUAGE", "French")
 
-        provider = AgentBrain.build_provider(source, temperature)
+        provider = AgentBase.build_provider(source, temperature)
         print(f"[TriggerAgent] Provider: {source.capitalize()} | temp: {temperature} | language: {target_language}")
         return cls(provider=provider, target_language=target_language)

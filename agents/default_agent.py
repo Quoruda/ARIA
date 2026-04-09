@@ -4,7 +4,7 @@ from datetime import datetime
 from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.prebuilt import ToolNode, tools_condition
 
-from brain.brain_module import AgentBrain
+from brain.brain_module import AgentBase
 from memory.context_provider import get_context_checkpointer
 from memory.scratchpad import ScratchpadManager, build_scratchpad_tools
 from tools.search_tool import get_search_tool
@@ -12,7 +12,7 @@ from triggers.trigger_tool import schedule_action
 from tools.weather_tool import get_weather_forecast
 
 
-class DefaultAgent(AgentBrain):
+class DefaultAgent(AgentBase):
     """
     The main conversational assistant agent.
     """
@@ -162,7 +162,7 @@ class DefaultAgent(AgentBrain):
         target_language = os.getenv("TARGET_LANGUAGE", "English")
         scratchpad_path = os.getenv("SCRATCHPAD_PATH") or None
 
-        provider = AgentBrain.build_provider(source, temperature)
+        provider = AgentBase.build_provider(source, temperature)
         print(
             f"[DefaultAgent] Provider: {source.capitalize()} | temp: {temperature} | memory: {max_messages} msgs | language: {target_language}"
         )
