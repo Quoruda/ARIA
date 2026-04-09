@@ -55,7 +55,9 @@ class PlanExecuteBase(AgentBase):
 
         llm = self.provider.get_model().with_structured_output(Plan)
 
-        prompt = f"""You are an expert planner.
+        prompt = f"""{self.system_prompt}
+        
+        You are an expert planner.
         Your goal: {state.get('initial_goal')}
         Break down this goal into a list of simple steps. You must only plan."""
 
@@ -70,18 +72,43 @@ class PlanExecuteBase(AgentBase):
         # It has access to the tools of the child class (self.tools)
         llm_with_tools = self.provider.get_model().bind_tools(self.tools)
 
-        prompt = f"""You are a worker.
+        prompt = f"""{self.system_prompt}
+        
+        You are a worker executing exactly this task.
         Global goal: {state.get('initial_goal')}
         What has already been done: {state.get('action_history', [])}
         
         Your immediate task: {current_task}
         Use your tools to accomplish it and provide the result."""
 
-        # (In complete production code, we would use a ToolNode here to manage tools)
+        # --- THE FIX: ACTUALLY EXECUTING THE TOOLS ---
         response = llm_with_tools.invoke(prompt)
+        final_result = response.content
 
-        # Add the result to the history
-        return {"action_history": [f"Task '{current_task}' completed. Result: {response.content}"]}
+        if response.tool_calls:
+            tool_results = []
+            for tool_call in response.tool_calls:
+                tool_name = tool_call["name"]
+                tool_args = tool_call["args"]
+                
+                print(f"🛠️  [WORKER] Executing tool: {tool_name} with {tool_args}")
+                
+                # Find and run the corresponding Python tool
+                for t in self.tools:
+                    if getattr(t, "name", "") == tool_name:
+                        try:
+                            # Invoke the actual Python function (Tavily, Weather, etc.)
+                            result = t.invoke(tool_args)
+                            tool_results.append(f"[{tool_name} data]: {result}")
+                        except Exception as e:
+                            tool_results.append(f"[{tool_name} error]: {e}")
+                        break
+            
+            # Replace the empty content with the REAL data from the web
+            final_result = "\n".join(tool_results)
+
+        # Add the REAL result to the history
+        return {"action_history": [f"Task '{current_task}' completed. Result: {final_result}"]}
 
     def _replanner_node(self, state: PlanExecuteState):
         """Checks if we are done, updates the plan, or drafts the final response."""
@@ -91,7 +118,9 @@ class PlanExecuteBase(AgentBase):
         # If there are no more tasks, it's time to review!
         if len(new_plan) == 0:
             llm = self.provider.get_model()
-            final_prompt = f"""The goal was: {state.get('initial_goal')}.
+            final_prompt = f"""{self.system_prompt}
+            
+            The goal was: {state.get('initial_goal')}.
             Here is everything that was found/done: {state.get('action_history')}
             Write a complete and structured final response for the user."""
 
