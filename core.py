@@ -63,7 +63,13 @@ class CoreOrchestrator:
         local_audio = self.channels.get("local_audio")
         if local_audio:
             if local_audio.voice:
-                busy = busy or (local_audio.voice.audio_queue.unfinished_tasks > 0)
+                try:
+                    import sounddevice as sd
+                    stream = sd.get_stream()
+                    if stream and stream.active:
+                        busy = True
+                except Exception:
+                    pass
             if local_audio.recorder:
                 busy = busy or local_audio.recorder.is_recording
                 

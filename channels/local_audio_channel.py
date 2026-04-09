@@ -38,13 +38,17 @@ class LocalAudioChannel(BaseChannel):
         if self.recorder:
             self.recorder.running = False
         if self.voice:
-            self.voice.stop_playback()
             self.voice.unload_model()
             
     def can_record(self) -> bool:
-        """Prevent recording if TTS is currently playing audio queue."""
-        if self.voice and self.voice.audio_queue.unfinished_tasks > 0:
-            return False
+        """Prevent recording if TTS is currently playing audio."""
+        try:
+            import sounddevice as sd
+            stream = sd.get_stream()
+            if stream and stream.active:
+                return False
+        except Exception:
+            pass
         return True
 
     def _on_mic_transcription(self, user_text: str):
