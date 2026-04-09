@@ -126,6 +126,23 @@ class DefaultAgent(AgentBase):
             "- You are an AI, do not mirror personal questions. Always prioritize using your tools (search, memory) when applicable."
         )
 
+    def _print_available_tools(self):
+        """Display all available tools for this agent."""
+        print("\n" + "="*60)
+        print("🛠️  AVAILABLE TOOLS")
+        print("="*60)
+
+        if not self.tools:
+            print("❌ No tools available")
+        else:
+            for i, tool in enumerate(self.tools, 1):
+                tool_name = getattr(tool, "name", "Unknown")
+                tool_description = getattr(tool, "description", "No description")
+                print(f"\n{i}. {tool_name}")
+                print(f"   Description: {tool_description}")
+
+        print("="*60 + "\n")
+
     def __init__(
         self,
         provider,
@@ -153,6 +170,9 @@ class DefaultAgent(AgentBase):
             thread_id="main",
             max_messages=max_messages,
         )
+
+        # Print available tools
+        self._print_available_tools()
 
     @classmethod
     def from_env(cls) -> "DefaultAgent":
