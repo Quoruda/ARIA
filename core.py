@@ -46,7 +46,7 @@ class CoreOrchestrator:
         # 3. Trigger Engine
         self.trigger_engine = TriggerEngine(
             is_busy=self.is_busy,
-            process_prompt=self.handle_trigger_prompt_sync,
+            process_trigger=self.handle_trigger_sync,
         )
 
         self._loop = None
@@ -79,6 +79,10 @@ class CoreOrchestrator:
         """Callback invoked by any Channel when a user inputs something."""
         self._is_generating = True
         try:
+            from triggers.scheduler import scheduler
+            scheduler.current_channel = message.source_channel
+            scheduler.current_user_id = message.user_id
+            
             # Helper to wrap the synchronous Agent stream into an async generator
             async def async_generator(user_input):
                  from tenacity import AsyncRetrying, stop_after_attempt, wait_fixed, retry_if_exception_type
@@ -120,12 +124,16 @@ class CoreOrchestrator:
         finally:
             self._is_generating = False
 
-    def handle_trigger_prompt_sync(self, text: str):
+    def handle_trigger_sync(self, trigger):
         """Called synchronously by the TriggerEngine background thread."""
         if self._loop and not self._loop.is_closed():
-            asyncio.run_coroutine_threadsafe(self._handle_trigger_async(text), self._loop)
+            asyncio.run_coroutine_threadsafe(self._handle_trigger_async(trigger), self._loop)
 
-    async def _handle_trigger_async(self, text: str):
+    async def _handle_trigger_async(self, trigger):
+        text = trigger.prompt
+        if getattr(trigger, "context", None):
+            text = f"[CONTEXT: {trigger.context}] {text}"
+            
         logging.info(f"Processing trigger: {text}")
         self._is_generating = True
         try:
@@ -151,17 +159,26 @@ class CoreOrchestrator:
                                 # final failure, silently stop (no user‑visible chunk needed)
                                 pass
                             raise
-            # Send triggers to the active primary channel (e.g. local_audio)
-            target = "local_audio" if "local_audio" in self.channels else "local_terminal"
+            # Evaluate trigger generator completely to allow broadcasting safely
+            response_text = ""
+            async for chunk in async_generator(text):
+                response_text += chunk
+
+            # Send triggers back to their originating channel
+            chan_name = getattr(trigger, "target_channel", None) or "local_terminal"
+            target_chan = self.channels.get(chan_name, self.channels.get("local_terminal"))
             
-            reply_msg = MessageContext(
-                source_channel="trigger_engine",
-                target_channel=target,
-                content=async_generator(text)
-            )
-            
-            if target in self.channels:
-                await self.channels[target].send_async(reply_msg)
+            if target_chan:
+                reply_msg = MessageContext(
+                    source_channel="trigger_engine",
+                    target_channel=chan_name,
+                    content=response_text,
+                    user_id=getattr(trigger, "user_id", None)
+                )
+                try:
+                    await target_chan.send_async(reply_msg)
+                except Exception as e:
+                    logging.error(f"Failed to send trigger to {chan_name}: {e}")
         finally:
             self._is_generating = False
 

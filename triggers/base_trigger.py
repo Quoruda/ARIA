@@ -13,12 +13,15 @@ class BaseTrigger(ABC):
     """
 
     def __init__(self, prompt: str, context: str = None):
+        from triggers.scheduler import scheduler
         self.id = str(uuid.uuid4())
         self.prompt = prompt
         self.context = context
         self.executed = False
         self._lock = Lock()
         self._claimed = False  # Prevents a trigger from being fetched multiple times before execution
+        self.target_channel = getattr(scheduler, 'current_channel', None)
+        self.user_id = getattr(scheduler, 'current_user_id', None)
 
     @abstractmethod
     def is_due(self) -> bool:

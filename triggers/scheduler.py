@@ -9,6 +9,8 @@ class TriggerScheduler:
     def __init__(self):
         self.triggers = []
         self._lock = Lock()
+        self.current_channel = None
+        self.current_user_id = None
 
     def add_trigger(self, trigger: BaseTrigger):
         """

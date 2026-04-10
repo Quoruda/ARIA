@@ -13,13 +13,13 @@ class TriggerEngine:
 
     It is decoupled from CoreManager and only depends on two callbacks:
     - is_busy(): tells if the system can process a new trigger
-    - process_prompt(prompt: str): actually handles the prompt (user or trigger)
+    - process_trigger(trigger: BaseTrigger): actually handles the trigger
     """
 
-    def __init__(self, is_busy: Callable[[], bool], process_prompt: Callable[[str], None],
+    def __init__(self, is_busy: Callable[[], bool], process_trigger: Callable[[any], None],
                  check_interval: float = 2.0, max_wait: float = 30.0):
         self._is_busy = is_busy
-        self._process_prompt = process_prompt
+        self._process_trigger = process_trigger
         self._check_interval = check_interval
         self._max_wait = max_wait
         self._stop_event = threading.Event()
@@ -50,14 +50,10 @@ class TriggerEngine:
                         f"Trigger timeout: system was busy for {self._max_wait}s, processing anyway"
                     )
 
-                full_prompt = trigger.prompt
-                if getattr(trigger, "context", None):
-                    full_prompt = f"[CONTEXT: {trigger.context}] {trigger.prompt}"
-
                 try:
-                    self._process_prompt(full_prompt)
+                    self._process_trigger(trigger)
                 except Exception:
-                    logger.exception("Error while processing trigger prompt")
+                    logger.exception("Error while processing trigger")
 
                 # Mark as executed only after dispatching processing
                 scheduler.mark_trigger_executed(trigger)
