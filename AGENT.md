@@ -55,11 +55,13 @@ Design note:
   - `brain/mistral_provider.py`: Mistral model provider
   - `brain/kobold_provider.py`: OpenAI-compatible local endpoint provider
 
-Two concrete agents live in `agents/`:
+Three concrete agents currently live in `agents/`:
 - `agents/default_agent.py`: main conversational assistant
   - Uses LangGraph checkpointer memory when enabled (see `memory/`)
   - Optional persistent scratchpad notes (`SCRATCHPAD_PATH`)
-  - Tools: trigger scheduling + web search + weather + scratchpad
+  - Tools: trigger scheduling + web search + weather + scratchpad + task delegation (e.g., Deep Research).
+- `agents/research_agent.py`: specialized Plan-and-Execute sub-agent
+  - Passed as a tool (`delegate_deep_research`) into the `DefaultAgent` to handle deep or complex tasks.
 - `agents/trigger_agent.py`: stateless execution agent for triggers
   - No conversation memory
   - Tools: temporal context + trigger scheduling
@@ -83,10 +85,10 @@ Implementation:
 
 ### 5. Triggers (Scheduler) (`triggers/`, `tools/`)
 The trigger system is decoupled from the UI and the LLM:
-- `triggers/base_trigger.py`: base trigger type (with claim/execution locking)
+- `triggers/base_trigger.py`: base trigger type (with claim/execution locking). Triggers inherently track the `target_channel` and `user_id` of the user who created them to ensure context-aware replies.
 - `triggers/time_trigger.py`: executes when a scheduled time window is reached
-- `triggers/scheduler.py`: in-memory scheduler (thread-safe)
-- `triggers/engine.py`: background polling loop that dispatches due triggers
+- `triggers/scheduler.py`: in-memory scheduler (thread-safe). It temporarily stores the `current_channel` during message processing.
+- `triggers/engine.py`: background polling loop that dispatches due triggers back to `core.py` with their original context.
 
 Tools exposed to the LLM:
 - `triggers/time_trigger_tool.py`: `schedule_at_time()`, `schedule_in_delay()`
@@ -251,6 +253,7 @@ Whenever possible, leverage existing, established libraries instead of writing c
 - Use `os.getenv("KEY", "default")` with sensible defaults so ARIA can start with minimal configuration.
 
 ### General Rules
+- **MANDATORY DOCUMENTATION UPDATE**: Any major modification, new feature, or architectural change MUST be documented in this `AGENT.md` file immediately. This ensures future AI agents understand the current state of the project without having to re-discover new systems.
 - Prefer small, composable modules over large monolithic files.
 - Keep orchestration in `core.py` — it wires components, it doesn't decide behavior.
 - Keep business logic out of tools: tools should delegate to modules and return structured results.
