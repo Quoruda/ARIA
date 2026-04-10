@@ -13,6 +13,8 @@ from channels.local_audio_channel import LocalAudioChannel
 from channels.local_terminal_channel import LocalTerminalChannel
 from channels.telegram_channel import TelegramChannel
 
+from ui.pixel_display_windowed import WindowedUI
+
 load_dotenv()
 
 # Suppress HF Hub and other library warnings
@@ -49,6 +51,9 @@ class CoreOrchestrator:
             process_trigger=self.handle_trigger_sync,
         )
 
+        # 4. User Interface
+        self.ui = WindowedUI()
+
         self._loop = None
         self._is_generating = False
 
@@ -78,6 +83,9 @@ class CoreOrchestrator:
     async def handle_incoming_message(self, message: MessageContext):
         """Callback invoked by any Channel when a user inputs something."""
         self._is_generating = True
+        if self.ui:
+            self.ui.set_state("thinking")
+            
         try:
             from triggers.scheduler import scheduler
             scheduler.current_channel = message.source_channel
@@ -100,6 +108,8 @@ class CoreOrchestrator:
                                  chunk = await asyncio.to_thread(next, gen, _sentinel)
                                  if chunk is _sentinel:
                                      break
+                                 if self.ui:
+                                     self.ui.set_state("speaking")
                                  yield chunk
                          except Exception as e:
                              if attempt.retry_state.attempt_number == 3:
@@ -123,6 +133,8 @@ class CoreOrchestrator:
                 
         finally:
             self._is_generating = False
+            if self.ui:
+                self.ui.set_state("idle")
 
     def handle_trigger_sync(self, trigger):
         """Called synchronously by the TriggerEngine background thread."""
@@ -136,6 +148,9 @@ class CoreOrchestrator:
             
         logging.info(f"Processing trigger: {text}")
         self._is_generating = True
+        if self.ui:
+            self.ui.set_state("thinking")
+            
         try:
             async def async_generator(user_input):
                 from tenacity import AsyncRetrying, stop_after_attempt, wait_fixed, retry_if_exception_type
@@ -176,15 +191,23 @@ class CoreOrchestrator:
                     user_id=getattr(trigger, "user_id", None)
                 )
                 try:
+                    if self.ui:
+                        self.ui.set_state("speaking")
                     await target_chan.send_async(reply_msg)
                 except Exception as e:
                     logging.error(f"Failed to send trigger to {chan_name}: {e}")
         finally:
             self._is_generating = False
+            if self.ui:
+                self.ui.set_state("idle")
 
     async def start(self):
         self._loop = asyncio.get_running_loop()
         
+        # Start UI
+        if self.ui:
+            self.ui.start()
+            
         # Special setup: If local audio is active, inject the Voice tools into the Brain
         if "local_audio" in self.channels:
             from tts.voice import Voice
@@ -212,6 +235,8 @@ class CoreOrchestrator:
             for chan in self.channels.values():
                 await chan.stop()
             self.trigger_engine.stop()
+            if self.ui:
+                self.ui.stop()
 
 if __name__ == "__main__":
     core = CoreOrchestrator()
