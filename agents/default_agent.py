@@ -10,6 +10,7 @@ from memory.scratchpad import ScratchpadManager, build_scratchpad_tools
 from tools.search_tool import get_search_tool
 from triggers.trigger_tool import schedule_action
 from tools.weather_tool import get_weather_forecast
+from agents.research_agent import ResearchAgent
 
 
 class DefaultAgent(AgentBase):
@@ -160,7 +161,8 @@ class DefaultAgent(AgentBase):
 
         scratchpad_tools = list(build_scratchpad_tools(self.scratchpad))
 
-        raw_tools = [schedule_action, get_search_tool(), get_weather_forecast, *scratchpad_tools]
+        research_agent = ResearchAgent.from_env()
+        raw_tools = [schedule_action, get_search_tool(), get_weather_forecast, research_agent.as_tool(), *scratchpad_tools]
         active_tools = [t for t in raw_tools if t is not None]
 
         super().__init__(

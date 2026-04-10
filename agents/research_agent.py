@@ -1,4 +1,5 @@
 import os
+from langchain_core.tools import tool, BaseTool
 from brain.plan_execute_base import PlanExecuteBase
 from brain.agent_base import AgentBase
 from tools.search_tool import get_search_tool
@@ -77,3 +78,25 @@ class ResearchAgent(PlanExecuteBase):
             max_messages=max_messages,
             checkpointer=checkpointer
         )
+
+    def as_tool(self) -> BaseTool:
+        @tool("delegate_deep_research")
+        def deep_research_tool(topic: str) -> str:
+            """
+            Delegate a deep research task to the Research Agent. Use this when a topic requires extensive investigation.
+            
+            Args:
+                topic (str): The subject or topic to investigate deeply.
+                
+            Returns:
+                str: A comprehensive, multi-faceted research report.
+                
+            Failure modes:
+                - If the underlying agent fails, it throws or returns an error message as a string.
+            """
+            return self.run(topic)
+        return deep_research_tool
+
+            
+        
+    
